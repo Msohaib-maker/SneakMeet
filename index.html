@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; media-src 'self' blob: mediastream:; connect-src 'self' ws: wss: https://generativelanguage.googleapis.com; img-src 'self' data:;">
+  <title>Presage Meet</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header>
+    <h1 class="brand"><span class="logo" aria-hidden="true"></span>PRESAGE<span class="brand-accent">MEET</span></h1>
+    <div class="header-right">
+      <span id="room-label" class="room-label" hidden></span>
+      <span id="status" class="status">Vitals off</span>
+      <button id="btn-settings" type="button" class="secondary icon" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <div id="settings" class="settings" hidden>
+    <div class="settings-grid">
+      <label class="field">SmartSpectra API key
+        <span class="row">
+          <input id="api-key" type="password" placeholder="Key from physiology.presagetech.com" autocomplete="off">
+          <button id="btn-show-key" type="button" class="secondary">Show</button>
+        </span>
+      </label>
+      <label class="field">Gemini API key (host AI briefs)
+        <span class="row">
+          <input id="gemini-key" type="password" placeholder="Key from aistudio.google.com" autocomplete="off">
+        </span>
+      </label>
+      <label class="field">Meeting server
+        <input id="server-url" type="text" placeholder="ws://localhost:8787" spellcheck="false">
+      </label>
+      <label class="field">Camera <select id="camera"></select></label>
+      <label class="field">Resolution
+        <select id="resolution">
+          <option value="640x480">640×480 (recommended)</option>
+          <option value="1280x720">1280×720</option>
+        </select>
+      </label>
+    </div>
+    <div class="row wrap">
+      <label class="check"><input id="lock-exposure" type="checkbox"> Lock exposure (keeps 30 fps, image may be darker)</label>
+      <label class="check"><input id="screen-light" type="checkbox"> Screen light</label>
+      <label class="check"><input id="simulated" type="checkbox"> Simulated vitals (no SDK credits used)</label>
+      <label class="check">AI insights (host)
+        <select id="ai-provider">
+          <option value="off">Off</option>
+          <option value="gemini">Gemini 3.5 Flash-Lite</option>
+          <option value="preview">Rule-based preview (no AI)</option>
+        </select>
+      </label>
+      <label class="check" id="brightness-wrap" hidden>Brightness <input id="brightness" type="range"></label>
+    </div>
+    <div class="row">
+      <span id="key-status" class="muted"></span>
+      <span class="spacer"></span>
+      <button id="btn-save-settings" type="button">Save</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- Lobby ------------------------------------------------------------ -->
+    <section id="lobby" class="lobby">
+      <div class="preview-col">
+        <div id="preview-wrap" class="preview">
+          <video id="preview" autoplay playsinline muted></video>
+          <span id="fps" class="fps-badge">— fps</span>
+        </div>
+        <div class="row">
+          <button id="btn-scan" type="button" class="secondary">◎ Start scan</button>
+          <span class="muted">Check your lighting and vitals before you join. Nothing is shared from the lobby.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Join a meeting</h2>
+        <label class="field">Your name <input id="name" maxlength="40" autocomplete="off"></label>
+        <label class="field">Room code
+          <span class="row">
+            <input id="room" maxlength="64" autocomplete="off" spellcheck="false">
+            <button id="btn-new-room" type="button" class="secondary">New</button>
+          </span>
+        </label>
+        <label class="check host-check"><input id="as-host" type="checkbox">
+          <span>Join as host and request wellness reports<br>
+          <span class="muted">Each participant is asked for consent; only those who agree send you a summary every ~25 s.</span></span>
+        </label>
+        <button id="btn-join" type="button">Join meeting</button>
+        <div id="lobby-msg" class="lobby-msg"></div>
+
+        <div class="consent">
+          <strong>How your data is handled</strong>
+          <ul>
+            <li>Video and audio go directly to the other participants (peer-to-peer). Nothing is recorded or stored.</li>
+            <li>Vitals are measured only when <em>you</em> turn on <b>Measure</b>, on this laptop, from your own camera.</li>
+            <li>Your vitals stay private unless you turn on <b>Share</b>. Turn it off any time.</li>
+            <li>If the meeting has a host, you'll be asked whether to send them periodic wellness summaries. You can decline, or stop at any time.</li>
+            <li>Wellness information only, not a medical device.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Meeting ---------------------------------------------------------- -->
+    <section id="meeting" class="meeting" hidden>
+      <div id="grid" class="grid"></div>
+
+      <aside class="side">
+        <div id="host-panel" class="host-panel" hidden>
+          <div class="row">
+            <div class="panel-title">Host dashboard</div>
+            <span class="spacer"></span>
+            <button id="btn-export" type="button" class="secondary small" title="All raw reports as CSV">CSV</button>
+          </div>
+          <div id="host-ai"></div>
+          <div id="host-cards" class="host-cards"></div>
+          <div class="muted">Only participants who consented. Wellness estimates, not a medical assessment.</div>
+        </div>
+        <div class="panel-title">My vitals <span class="muted">· private unless shared</span></div>
+        <div class="readout"><div class="label">Pulse</div><span id="v-pulse" class="value">—</span> <span class="unit">bpm</span></div>
+        <div class="readout"><div class="label">Breathing</div><span id="v-breath" class="value">—</span> <span class="unit">/min</span></div>
+        <div class="readout"><div class="label">HRV (RMSSD)</div><span id="v-hrv" class="value">—</span> <span class="unit">ms</span></div>
+        <div id="hint" class="hint-box">Turn on <b>Measure</b> to start.</div>
+        <div class="muted">Camera: <span id="cam-fps">— fps</span></div>
+        <div class="panel-title">Log</div>
+        <pre id="log" class="log"></pre>
+      </aside>
+
+      <div class="toolbar">
+        <button id="btn-mic" type="button" class="tool on">Mic on</button>
+        <button id="btn-cam" type="button" class="tool on">Camera on</button>
+        <button id="btn-measure" type="button" class="tool">Measure vitals</button>
+        <button id="btn-share" type="button" class="tool" disabled>Share vitals</button>
+        <button id="btn-host-report" type="button" class="tool" hidden>Report to host</button>
+        <button id="btn-leave" type="button" class="danger">Leave</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="consent-modal" class="modal" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+      <h2 id="consent-title">The host is requesting wellness reports</h2>
+      <p><b id="consent-host">The host</b> would like to receive a short wellness summary from you during this meeting.</p>
+      <ul>
+        <li>If you agree, this app measures your pulse, breathing and HRV, plus face signals (face in frame, facing the screen, talking, blinking, expression scores), <b>on this laptop</b> from your camera.</li>
+        <li>Your live readings (once per second) and a summary every ~25 seconds are sent <b>only to the host</b>, peer-to-peer. The host sees them next to your video; you and the others do not. No video frames are sent, and nothing is stored on a server.</li>
+        <li>The host's app may send these numbers to Google's Gemini AI about every 40 seconds to write a short brief, including an engagement estimate. Your name and video are never sent, only an anonymous label (like “P1”) and the numbers. On Gemini's free tier, Google may use this data to improve its products.</li>
+        <li>Everyone in the meeting sees a <b>“Reporting to host”</b> badge on your video while this is on.</li>
+        <li>You can stop at any time with the <b>Report to host</b> button. Declining does not affect your meeting.</li>
+        <li>These are wellness estimates, not a medical diagnosis.</li>
+      </ul>
+      <div class="row">
+        <span class="spacer"></span>
+        <button id="btn-consent-no" type="button" class="secondary">Don't share</button>
+        <button id="btn-consent-yes" type="button">Share with host</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="report-modal" class="modal" hidden></div>
+
+  <footer>Wellness/demo use only, not a medical device. Vitals are computed on-device by the Presage SmartSpectra SDK.</footer>
+
+  <script src="./dist/renderer.bundle.js"></script>
+</body>
+</html>

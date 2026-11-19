@@ -1,0 +1,69 @@
+{
+  "name": "presage-meet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Desktop video meetings with opt-in, on-device vitals powered by the Presage SmartSpectra SDK.",
+  "main": "main.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "npm run build && electron .",
+    "server": "node server/signaling.js",
+    "start:second": "npm run build && cross-env MEET_PROFILE=2 electron .",
+    "debug": "npm run build && cross-env SMARTSPECTRA_DIAGNOSTICS=1 electron .",
+    "dist": "cross-env RELEASE=1 node build.mjs && electron-builder --win"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "43.8.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.25.0"
+  },
+  "productName": "Presage Meet",
+  "author": "Msohaib-maker",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Msohaib-maker/SneakMeet.git"
+  },
+  "build": {
+    "appId": "io.github.msohaib-maker.presagemeet",
+    "productName": "Presage Meet",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "styles.css",
+      "dist/**/*",
+      "package.json",
+      "!node_modules/@smartspectra/node-sdk-*/**",
+      "!node_modules/ws/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "node_modules/@smartspectra/node-sdk-win32-${arch}/",
+          "to": "smartspectra/"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Presage-Meet-Setup-${version}.exe"
+    }
+  }
+}
