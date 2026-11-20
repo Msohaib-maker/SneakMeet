@@ -16,6 +16,10 @@ Built for the [DEV.to Presage SmartSpectra SDK Challenge](https://dev.to/challen
   signals (face in frame, facing the screen, talking, blinks, expression scores). Everything is computed
   on that person's laptop by the SmartSpectra SDK.
 - **Lobby scan:** a private HUD over your own preview to check lighting and readings before joining.
+- **Scanner effect:** an optional decorative grid and scan line on your own meeting tile (only you see
+  it, no readings). Toggle it with **◎ Scanner** in the toolbar.
+- **Echo suppression** for laptop speakers: lowers your mic while someone else is talking, on top of the
+  browser's echo canceller (⚙ Settings → Camera & audio; turn off with headphones for full two-way talk).
 - **Host dashboard** (with consent): a compact report card per participant, a small scan readout on their
   video (visible to the host only), full reports with trend charts, and CSV/Markdown downloads.
 - **"Pixel", the AI analyst:** every ~40 s the host's app turns the latest reports into a short brief
@@ -29,13 +33,13 @@ Built for the [DEV.to Presage SmartSpectra SDK Challenge](https://dev.to/challen
    [Releases page](https://github.com/Msohaib-maker/SneakMeet/releases) and run it.
    The installer is not code-signed, so Windows SmartScreen may warn you: choose
    **More info → Run anyway**.
-2. Open **⚙ Settings**:
-   - **SmartSpectra API key** for real vitals (free at https://physiology.presagetech.com/auth/register),
-     or keep **Simulated vitals** on to try the app without one.
-   - **Gemini API key** (host only, optional) from https://aistudio.google.com/apikey for AI briefs,
-     or choose **Rule-based preview (no AI)**.
-   - **Meeting server:** the `wss://…` address of a deployed signaling server (see below), or a
-     `ws://<ip>:8787` address on your local network.
+2. Open **⚙ Settings** (or click the **Vitals:** chip in the lobby):
+   - **Vitals:** choose **Real readings** and paste a SmartSpectra API key (free at
+     https://physiology.presagetech.com/auth/register), or **Simulated** to try the app without one.
+     The lobby chip always shows which mode you're in.
+   - **AI briefs** (host only, optional): a Gemini API key from https://aistudio.google.com/apikey,
+     or **Rule-based preview (no AI)**.
+   - **Meeting:** the `wss://…` address of the signaling server. Everyone in a meeting must use the same one.
 3. Enter your name and a room code (share it with the others) and join. Tick **Join as host** to receive
    wellness reports.
 
@@ -69,7 +73,8 @@ Gemini key, and include the SmartSpectra key only if `RELEASE_INCLUDE_SMARTSPECT
 
 These environment variables exist for automated testing and are not reachable from the app UI:
 `MEET_PROFILE` (separate second instance), `MEET_AUTOJOIN=room:name[:host]`, `MEET_AUTOCONSENT=1`
-(auto-accepts the consent dialog in a test instance), `MEET_SIMULATED=0|1`.
+(auto-accepts the consent dialog in a test instance), `MEET_SIMULATED=0|1`, `MEET_SHOTS=<dir>` (saves UI
+screenshots).
 
 ## Deploy the meeting server
 

@@ -17,47 +17,95 @@
     </div>
   </header>
 
-  <div id="settings" class="settings" hidden>
-    <div class="settings-grid">
-      <label class="field">SmartSpectra API key
-        <span class="row">
-          <input id="api-key" type="password" placeholder="Key from physiology.presagetech.com" autocomplete="off">
-          <button id="btn-show-key" type="button" class="secondary">Show</button>
-        </span>
-      </label>
-      <label class="field">Gemini API key (host AI briefs)
-        <span class="row">
-          <input id="gemini-key" type="password" placeholder="Key from aistudio.google.com" autocomplete="off">
-        </span>
-      </label>
-      <label class="field">Meeting server
-        <input id="server-url" type="text" placeholder="ws://localhost:8787" spellcheck="false">
-      </label>
-      <label class="field">Camera <select id="camera"></select></label>
-      <label class="field">Resolution
-        <select id="resolution">
-          <option value="640x480">640×480 (recommended)</option>
-          <option value="1280x720">1280×720</option>
-        </select>
-      </label>
-    </div>
-    <div class="row wrap">
-      <label class="check"><input id="lock-exposure" type="checkbox"> Lock exposure (keeps 30 fps, image may be darker)</label>
-      <label class="check"><input id="screen-light" type="checkbox"> Screen light</label>
-      <label class="check"><input id="simulated" type="checkbox"> Simulated vitals (no SDK credits used)</label>
-      <label class="check">AI insights (host)
-        <select id="ai-provider">
-          <option value="off">Off</option>
-          <option value="gemini">Gemini 3.5 Flash-Lite</option>
-          <option value="preview">Rule-based preview (no AI)</option>
-        </select>
-      </label>
-      <label class="check" id="brightness-wrap" hidden>Brightness <input id="brightness" type="range"></label>
-    </div>
-    <div class="row">
-      <span id="key-status" class="muted"></span>
-      <span class="spacer"></span>
-      <button id="btn-save-settings" type="button">Save</button>
+  <div id="settings" class="modal" hidden>
+    <div class="modal-box settings-box" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="settings-head">
+        <h2 id="settings-title">⚙ Settings</h2>
+        <span class="spacer"></span>
+        <button id="btn-close-settings" type="button" class="secondary icon" title="Close (Esc)" aria-label="Close">✕</button>
+      </div>
+      <p class="muted settings-intro">Changes are saved automatically. Hover or read the notes under each option.</p>
+
+      <nav class="settings-tabs" role="tablist">
+        <button type="button" class="stab active" data-tab="vitals" role="tab">❤ Vitals</button>
+        <button type="button" class="stab" data-tab="camera" role="tab">📷 Camera &amp; audio</button>
+        <button type="button" class="stab" data-tab="meeting" role="tab">🌐 Meeting</button>
+        <button type="button" class="stab" data-tab="ai" role="tab">🤖 AI briefs</button>
+      </nav>
+
+      <section class="spane" data-pane="vitals">
+        <div class="mode-pick" role="radiogroup" aria-label="Vitals source">
+          <label class="mode-opt"><input type="radio" name="vitals-mode" value="real">
+            <span><b>Real readings</b><small>Presage SmartSpectra SDK measures from your camera. Needs an API key; uses SDK credits.</small></span>
+          </label>
+          <label class="mode-opt"><input type="radio" name="vitals-mode" value="sim">
+            <span><b>Simulated</b><small>Made-up demo numbers, labelled SIMULATED everywhere. No key, no credits.</small></span>
+          </label>
+        </div>
+        <input id="simulated" type="checkbox" hidden>
+        <label class="field">SmartSpectra API key
+          <span class="row">
+            <input id="api-key" type="password" placeholder="Paste your key" autocomplete="off" spellcheck="false">
+            <button id="btn-show-key" type="button" class="secondary">Show</button>
+          </span>
+          <span class="help">Free key: <b>physiology.presagetech.com</b> → register → API keys. Stored only on this computer.</span>
+        </label>
+        <div id="key-status" class="key-status"></div>
+      </section>
+
+      <section class="spane" data-pane="camera" hidden>
+        <div class="settings-grid">
+          <label class="field">Camera <select id="camera"></select></label>
+          <label class="field">Resolution
+            <select id="resolution">
+              <option value="640x480">640×480 (recommended)</option>
+              <option value="1280x720">1280×720</option>
+            </select>
+          </label>
+        </div>
+        <label class="opt"><input id="lock-exposure" type="checkbox">
+          <span><b>Lock exposure</b><small>Keeps the camera at 30 fps (real vitals need 25+). The image may look darker. Camera options can be changed in the lobby only.</small></span>
+        </label>
+        <label class="opt"><input id="screen-light" type="checkbox">
+          <span><b>Screen light</b><small>Brightens the screen to light your face in a dark room.</small></span>
+        </label>
+        <label class="field" id="brightness-wrap" hidden>Camera brightness <input id="brightness" type="range"></label>
+        <label class="opt"><input id="echo-gate" type="checkbox">
+          <span><b>Echo suppression (laptop speakers)</b><small>Lowers your mic while others are talking so they don't hear themselves back. Turn off if you use headphones and want full two-way talk.</small></span>
+        </label>
+        <label class="opt"><input id="self-scan" type="checkbox">
+          <span><b>Scanner effect on my video</b><small>Decorative grid and scan line over your own tile. Only you see it; it shows no readings.</small></span>
+        </label>
+      </section>
+
+      <section class="spane" data-pane="meeting" hidden>
+        <label class="field">Meeting server
+          <input id="server-url" type="text" placeholder="wss://your-server.fly.dev" spellcheck="false">
+          <span class="help">Everyone in a meeting must use the same server. Leave as is unless you host your own.</span>
+        </label>
+      </section>
+
+      <section class="spane" data-pane="ai" hidden>
+        <p class="help">Only used when <b>you are the host</b>. Turns consented participants' readings into short briefs every ~40 s. Names and video are never sent.</p>
+        <label class="field">AI insights
+          <select id="ai-provider">
+            <option value="gemini">Gemini 3.5 Flash-Lite (needs key)</option>
+            <option value="preview">Rule-based preview (no AI, offline)</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label class="field">Gemini API key
+          <span class="row">
+            <input id="gemini-key" type="password" placeholder="Paste your key" autocomplete="off" spellcheck="false">
+          </span>
+          <span class="help">Free key: <b>aistudio.google.com/apikey</b>. Stored only on this computer.</span>
+        </label>
+      </section>
+
+      <div class="row settings-foot">
+        <span class="spacer"></span>
+        <button id="btn-save-settings" type="button">Done</button>
+      </div>
     </div>
   </div>
 
@@ -71,6 +119,7 @@
         </div>
         <div class="row">
           <button id="btn-scan" type="button" class="secondary">◎ Start scan</button>
+          <button id="mode-chip" type="button" class="mode-chip" title="Change in Settings"></button>
           <span class="muted">Check your lighting and vitals before you join. Nothing is shared from the lobby.</span>
         </div>
       </div>
@@ -132,6 +181,7 @@
       <div class="toolbar">
         <button id="btn-mic" type="button" class="tool on">Mic on</button>
         <button id="btn-cam" type="button" class="tool on">Camera on</button>
+        <button id="btn-self-scan" type="button" class="tool" title="Decorative scanner on your own video (only you see it)">◎ Scanner</button>
         <button id="btn-measure" type="button" class="tool">Measure vitals</button>
         <button id="btn-share" type="button" class="tool" disabled>Share vitals</button>
         <button id="btn-host-report" type="button" class="tool" hidden>Report to host</button>

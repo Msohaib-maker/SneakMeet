@@ -10,6 +10,7 @@ import { ReportBuilder, REPORT_INTERVAL_MS } from './reports.js';
 import { HostDashboard, topExpression } from './host-dashboard.js';
 import { Meeting } from './meeting.js';
 import { ScanOverlay } from './scan.js';
+import { EchoGate } from './echo-gate.js';
 import { ReportModal } from './report-modal.js';
 import { AIBriefer } from './ai-brief.js';
 import { HostAIPanel, reportCardMarkdown, allReportsMarkdown, downloadText } from './host-ai.js';
@@ -24,7 +25,10 @@ const els = {
   camera: $('camera'), resolution: $('resolution'), lockExposure: $('lock-exposure'),
   screenLight: $('screen-light'), simulated: $('simulated'), aiProvider: $('ai-provider'),
   brightness: $('brightness'), brightnessWrap: $('brightness-wrap'),
-  keyStatus: $('key-status'), btnSaveSettings: $('btn-save-settings'),
+  keyStatus: $('key-status'), btnSaveSettings: $('btn-save-settings'), btnCloseSettings: $('btn-close-settings'),
+  echoGate: $('echo-gate'), selfScan: $('self-scan'), modeChip: $('mode-chip'),
+  modeRadios: [...document.querySelectorAll('input[name="vitals-mode"]')],
+  settingsTabs: [...document.querySelectorAll('.stab')], settingsPanes: [...document.querySelectorAll('.spane')],
   // lobby
   lobby: $('lobby'), preview: $('preview'), previewWrap: $('preview-wrap'), btnScan: $('btn-scan'), fps: $('fps'), name: $('name'), room: $('room'),
   btnNewRoom: $('btn-new-room'), asHost: $('as-host'), btnJoin: $('btn-join'), lobbyMsg: $('lobby-msg'),
@@ -32,7 +36,7 @@ const els = {
   meeting: $('meeting'), grid: $('grid'), vPulse: $('v-pulse'), vBreath: $('v-breath'), vHrv: $('v-hrv'),
   hint: $('hint'), camFps: $('cam-fps'), log: $('log'),
   hostPanel: $('host-panel'), hostCards: $('host-cards'), hostAi: $('host-ai'), btnExport: $('btn-export'),
-  btnMic: $('btn-mic'), btnCam: $('btn-cam'), btnMeasure: $('btn-measure'), btnShare: $('btn-share'),
+  btnMic: $('btn-mic'), btnCam: $('btn-cam'), btnSelfScan: $('btn-self-scan'), btnMeasure: $('btn-measure'), btnShare: $('btn-share'),
   btnHostReport: $('btn-host-report'), btnLeave: $('btn-leave'),
   // consent
   consentModal: $('consent-modal'), consentHost: $('consent-host'),
@@ -54,7 +58,8 @@ const state = {
   camStream: null,      // video-only stream (real camera or placeholder)
   placeholder: false,
   stopFps: null,
-  mic: null,
+  mic: null,            // outgoing mic track (through the echo gate when on)
+  echoGate: null,
   meeting: null,
   joined: false,
   vitals: null,         // VitalsMonitor | SimulatedVitals
@@ -76,6 +81,7 @@ const state = {
   aiPanel: null,        // host: bot + status
   // scan HUDs
   lobbyScan: null,         // your own pre-join check (lobby only)
+  selfScan: null,          // decorative scanner on your own meeting tile
 };
 
 function log(msg) {
@@ -104,7 +110,10 @@ function loadSettings() {
   els.lockExposure.checked = store.get('lockExposure', '1') === '1';
   els.screenLight.checked = store.get('screenLight', '0') === '1';
   const simParam = new URLSearchParams(location.search).get('simulated');
-  els.simulated.checked = simParam ? simParam === '1' : store.get('simulated', '1') === '1';
+  // Default: real readings when a SmartSpectra key is available, else simulated.
+  els.simulated.checked = simParam ? simParam === '1' : store.get('simulated', els.apiKey.value ? '0' : '1') === '1';
+  els.echoGate.checked = store.get('echoGate', '1') === '1';
+  els.selfScan.checked = store.get('selfScan', '1') === '1';
   els.geminiKey.value = store.get('geminiKey', __DEFAULT_GEMINI_KEY__);
   els.aiProvider.value = store.get('aiProvider', els.geminiKey.value ? 'gemini' : 'preview');
   if (!els.aiProvider.value) els.aiProvider.value = 'preview';
@@ -124,13 +133,44 @@ function saveSettings() {
   store.set('aiProvider', els.aiProvider.value);
   store.set('geminiKey', els.geminiKey.value.trim());
   store.set('camera', els.camera.value);
+  store.set('echoGate', els.echoGate.checked ? '1' : '0');
+  store.set('selfScan', els.selfScan.checked ? '1' : '0');
   updateKeyStatus();
 }
 
 function updateKeyStatus() {
   const k = els.apiKey.value.trim();
-  const keyText = k ? `API key set (…${k.slice(-4)})` : 'No API key set: real vitals cannot start.';
-  els.keyStatus.textContent = els.simulated.checked ? `${keyText} · Simulated vitals ON (no credits used)` : keyText;
+  const sim = els.simulated.checked;
+  for (const r of els.modeRadios) r.checked = r.value === (sim ? 'sim' : 'real');
+  let text, cls;
+  if (sim) { text = 'Simulated mode: demo numbers only, no SDK credits used.'; cls = 'warn'; }
+  else if (k) { text = `✓ Real readings ready (key …${k.slice(-4)}). Press Measure or Start scan.`; cls = 'ok'; }
+  else { text = '⚠ Paste your SmartSpectra API key above to measure real vitals.'; cls = 'warn'; }
+  els.keyStatus.textContent = text;
+  els.keyStatus.className = `key-status ${cls}`;
+  // Lobby chip, and a dot on the tab that needs attention.
+  const needKey = !sim && !k;
+  els.modeChip.textContent = sim ? 'Vitals: SIMULATED · change' : needKey ? 'Vitals: key needed · set up' : 'Vitals: REAL (SDK)';
+  els.modeChip.className = `mode-chip ${sim || needKey ? 'sim' : 'real'}`;
+  const vitalsTab = els.settingsTabs.find((t) => t.dataset.tab === 'vitals');
+  vitalsTab.querySelector('.dot')?.remove();
+  if (needKey) vitalsTab.insertAdjacentHTML('beforeend', '<span class="dot" title="Needs attention"></span>');
+}
+
+function showSettingsTab(tab) {
+  for (const t of els.settingsTabs) t.classList.toggle('active', t.dataset.tab === tab);
+  for (const p of els.settingsPanes) p.hidden = p.dataset.pane !== tab;
+}
+
+function openSettings(tab = 'vitals') {
+  showSettingsTab(tab);
+  els.settings.hidden = false;
+  els.btnCloseSettings.focus();
+}
+
+function closeSettings() {
+  saveSettings();
+  els.settings.hidden = true;
 }
 
 function applyScreenLight() {
@@ -261,7 +301,14 @@ function renderSelf() {
   renderBadges(state.self, {
     isHost: state.isHost, measuring: state.measuring, sharing: state.sharing, reporting: reportingToHost(),
   });
-  renderTileVitals(state.self, state.sharing ? state.my : null, 'visible to others');
+  // No readings on your own tile: they're in the side panel.
+}
+
+function renderSelfScan() {
+  const on = els.selfScan.checked && !!state.self;
+  if (on && !state.selfScan) state.selfScan = new ScanOverlay(state.self.root, { ambient: true });
+  if (!on && state.selfScan) { state.selfScan.destroy(); state.selfScan = null; }
+  setTool(els.btnSelfScan, els.selfScan.checked, '◎ Scanner on', '◎ Scanner off');
 }
 
 // --- Peers -----------------------------------------------------------------
@@ -279,6 +326,7 @@ function removePeer(id) {
   const p = state.peers.get(id);
   if (!p) return;
   p.tile.root.remove();
+  state.echoGate?.removeRemote(p.stream);
   state.peers.delete(id);
   state.dashboard?.memberLeft(id);
   log(`${p.name} left`);
@@ -518,7 +566,7 @@ async function startMeasuring() {
   const simulated = els.simulated.checked;
   const apiKey = els.apiKey.value.trim();
   if (!simulated) {
-    if (!apiKey) { els.settings.hidden = false; log('Set your SmartSpectra API key in Settings first.'); return; }
+    if (!apiKey) { openSettings('vitals'); log('Set your SmartSpectra API key in Settings first.'); return; }
     if (state.placeholder) { log('Real vitals need a camera (or enable Simulated vitals in Settings).'); return; }
     if (!state.camStream.getVideoTracks()[0].enabled) { log('Turn your camera on to measure vitals.'); return; }
   }
@@ -613,6 +661,12 @@ function setLobbyControls(enabled) {
   for (const el of [els.camera, els.resolution, els.lockExposure]) el.disabled = !enabled;
 }
 
+function stopMic() {
+  if (state.echoGate) { state.echoGate.stop(); state.echoGate = null; }
+  else if (state.mic) state.mic.stop();
+  state.mic = null;
+}
+
 async function join() {
   const name = els.name.value.trim();
   const room = els.room.value.trim();
@@ -625,7 +679,15 @@ async function join() {
 
   els.btnJoin.disabled = true;
   els.lobbyMsg.textContent = 'Connecting…';
-  state.mic = NO_AUDIO ? null : await openMic(log);
+  const rawMic = NO_AUDIO ? null : await openMic(log);
+  state.mic = rawMic;
+  if (rawMic) {
+    try {
+      state.echoGate = new EchoGate(rawMic);
+      state.echoGate.setEnabled(els.echoGate.checked);
+      state.mic = state.echoGate.track;
+    } catch (e) { log(`Echo suppression unavailable (${e.message}).`); }
+  }
   if (NO_AUDIO) log('Test instance: audio disabled to avoid echo on the same laptop.');
   const localStream = new MediaStream([
     ...state.camStream.getVideoTracks(),
@@ -640,7 +702,13 @@ async function join() {
     serverUrl, room, name, localStream, log, host: els.asHost.checked,
     onPeerJoined: addPeer,
     onPeerLeft: removePeer,
-    onPeerStream: (id, s) => { const p = state.peers.get(id); if (p) attachVideo(p.tile.video, s); },
+    onPeerStream: (id, s) => {
+      const p = state.peers.get(id);
+      if (!p) return;
+      if (p.tile.video.srcObject !== s) attachVideo(p.tile.video, s);
+      p.stream = s;
+      state.echoGate?.addRemote(s);
+    },
     onPeerData,
     onChannelOpen: (id) => {
       meeting.sendTo(id, stateMessage());
@@ -664,7 +732,7 @@ async function join() {
     els.btnJoin.disabled = false;
     state.self.root.remove();
     state.self = null;
-    if (state.mic) { state.mic.stop(); state.mic = null; }
+    stopMic();
     for (const p of state.peers.values()) p.tile.root.remove();
     state.peers.clear();
     return;
@@ -716,6 +784,7 @@ async function join() {
   updateToolbar();
   renderMyVitals(state.my);
   renderSelf();
+  renderSelfScan();
   renderScans();
   for (const id of state.peers.keys()) renderPeer(id);
   state.broadcastTimer = setInterval(broadcastState, 1000);
@@ -742,10 +811,12 @@ async function leave() {
   els.meeting.classList.remove('is-host');
   for (const p of state.peers.values()) p.tile.root.remove();
   state.peers.clear();
+  state.selfScan?.destroy();
+  state.selfScan = null;
   state.self?.root.remove();
   state.self = null;
   state.reportModal?.close();
-  if (state.mic) { state.mic.stop(); state.mic = null; }
+  stopMic();
   const camTrack = state.camStream?.getVideoTracks()[0];
   if (camTrack) camTrack.enabled = true;
 
@@ -760,14 +831,38 @@ async function leave() {
 
 // --- Wiring ----------------------------------------------------------------
 
-els.btnSettings.addEventListener('click', () => { els.settings.hidden = !els.settings.hidden; });
+els.btnSettings.addEventListener('click', () => (els.settings.hidden ? openSettings() : closeSettings()));
+els.modeChip.addEventListener('click', () => openSettings('vitals'));
+els.btnCloseSettings.addEventListener('click', closeSettings);
+els.settings.addEventListener('mousedown', (e) => { if (e.target === els.settings) closeSettings(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !els.settings.hidden) closeSettings(); });
+for (const t of els.settingsTabs) t.addEventListener('click', () => showSettingsTab(t.dataset.tab));
+for (const r of els.modeRadios) {
+  r.addEventListener('change', () => {
+    els.simulated.checked = r.value === 'sim';
+    els.simulated.dispatchEvent(new Event('change'));
+    if (r.value === 'real' && !els.apiKey.value.trim()) els.apiKey.focus();
+  });
+}
 els.geminiKey.addEventListener('change', saveSettings);
+let hadKey = !!els.apiKey.value.trim();
+els.apiKey.addEventListener('change', () => {
+  const hasKey = !!els.apiKey.value.trim();
+  // First key entered: assume the user wants real readings now.
+  if (hasKey && !hadKey && els.simulated.checked) els.simulated.checked = false;
+  hadKey = hasKey;
+  saveSettings();
+});
+els.serverUrl.addEventListener('change', saveSettings);
+els.echoGate.addEventListener('change', () => { saveSettings(); state.echoGate?.setEnabled(els.echoGate.checked); });
+els.selfScan.addEventListener('change', () => { saveSettings(); renderSelfScan(); });
+els.btnSelfScan.addEventListener('click', () => { els.selfScan.checked = !els.selfScan.checked; saveSettings(); renderSelfScan(); });
 els.btnShowKey.addEventListener('click', () => {
   const show = els.apiKey.type === 'password';
   els.apiKey.type = show ? 'text' : 'password';
   els.btnShowKey.textContent = show ? 'Hide' : 'Show';
 });
-els.btnSaveSettings.addEventListener('click', () => { saveSettings(); els.settings.hidden = true; });
+els.btnSaveSettings.addEventListener('click', closeSettings);
 els.apiKey.addEventListener('input', updateKeyStatus);
 els.simulated.addEventListener('change', () => {
   saveSettings();
@@ -830,7 +925,7 @@ window.__shutdown = async () => {
   await stopMeasuring();
   state.meeting?.leave();
   stopCamera();
-  if (state.mic) state.mic.stop();
+  stopMic();
   return { wasMeasuring };
 };
 
@@ -845,7 +940,7 @@ window.__shutdown = async () => {
     getBriefer: () => state.briefer,
   });
   renderScans();
-  if (!els.apiKey.value && !els.simulated.checked) els.settings.hidden = false;
+  if (!els.apiKey.value && !els.simulated.checked) openSettings('vitals');
   await populateCameras();
   await startCamera();
 

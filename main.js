@@ -73,6 +73,28 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'index.html'), { query });
 
   if (process.env.SMARTSPECTRA_DIAGNOSTICS === '1') win.webContents.openDevTools({ mode: 'detach' });
+
+  // Testing: MEET_SHOTS=<dir> saves screenshots of the meeting and the settings dialog.
+  if (process.env.MEET_SHOTS) {
+    const fs = require('fs');
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const shot = async (name) => fs.writeFileSync(path.join(process.env.MEET_SHOTS, `${name}.png`), (await win.webContents.capturePage()).toPNG());
+    const click = (sel) => win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(sel)})?.click()`);
+    win.webContents.once('did-finish-load', async () => {
+      await wait(9000); await shot('1-main');
+      console.log('[shots] layout', await win.webContents.executeJavaScript(`JSON.stringify({
+        grid: document.getElementById('grid').getBoundingClientRect(),
+        tiles: [...document.querySelectorAll('.tile')].map((t) => [t.className, Math.round(t.getBoundingClientRect().top), Math.round(t.getBoundingClientRect().height), Math.round(t.getBoundingClientRect().width)]),
+        win: [innerWidth, innerHeight] })`));
+      await click('#btn-settings'); await wait(1500);
+      console.log('[shots] settings hidden =', await win.webContents.executeJavaScript(`document.getElementById('settings').hidden + ' ' + getComputedStyle(document.getElementById('settings')).display`));
+      await shot('2-settings-vitals');
+      await click('.stab[data-tab="camera"]'); await wait(1500); await shot('3-settings-camera');
+      await click('.stab[data-tab="ai"]'); await wait(1500); await shot('4-settings-ai');
+      await click('#btn-close-settings'); await click('#btn-self-scan'); await wait(1500); await shot('5-scanner-off');
+      await click('#btn-self-scan');
+    });
+  }
 }
 
 app.whenReady().then(() => {

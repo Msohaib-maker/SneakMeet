@@ -18,8 +18,18 @@ const METRICS = [
 export class ScanOverlay {
   // compact: host view of a participant: corners + a small corner readout only,
   // nothing drawn across the face.
-  constructor(container, { compact = false } = {}) {
+  // ambient: decorative only (grid + sweeping line + corners) for your own
+  // meeting tile. Shows no readings and no text.
+  constructor(container, { compact = false, ambient = false } = {}) {
     this.compact = compact;
+    this.ambient = ambient;
+    if (ambient) {
+      this.root = el('div', 'scan ambient');
+      this.root.append(el('div', 'scan-grid'), el('div', 'scan-line'),
+        el('i', 'corner tl'), el('i', 'corner tr'), el('i', 'corner bl'), el('i', 'corner br'));
+      container.appendChild(this.root);
+      return;
+    }
     this.root = el('div', `scan idle${compact ? ' compact' : ''}`);
     this.root.append(el('i', 'corner tl'), el('i', 'corner tr'), el('i', 'corner bl'), el('i', 'corner br'));
     if (!compact) {
@@ -49,6 +59,7 @@ export class ScanOverlay {
 
   // s: { measuring, simulated, my }   my = latest vitals update or null
   update({ measuring, simulated, my }) {
+    if (this.ambient) return;
     const elapsed = my?.elapsed ?? 0;
     const locked = measuring && METRICS.every(([key, , w]) => my?.[key] != null && elapsed >= w);
     this.root.classList.toggle('idle', !measuring);
