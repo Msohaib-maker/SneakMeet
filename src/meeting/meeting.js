@@ -1,13 +1,7 @@
-// Full-mesh WebRTC meeting. The signaling server only relays connection
-// setup; audio/video and the vitals data channel go directly peer-to-peer.
-
 const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 export class Meeting {
   constructor(opts) {
-    // opts: serverUrl, room, name, localStream, log,
-    //       onPeerJoined(id, name), onPeerLeft(id), onPeerStream(id, stream),
-    //       onPeerData(id, msg), onChannelOpen(id), onDisconnected()
     this.o = opts;
     this.peers = new Map();
     this.ws = null;
@@ -40,7 +34,6 @@ export class Meeting {
             this.id = msg.id;
             this.hostId = msg.hostId || null;
             resolve();
-            // The newcomer offers to everyone already in the room (avoids glare).
             for (const p of msg.peers) this._createPeer(p.id, p.name, true);
             break;
           case 'peer-joined':
@@ -58,7 +51,6 @@ export class Meeting {
             this._removePeer(msg.id);
             break;
           case 'signal':
-            // Process signals strictly in order.
             this.signalQueue = this.signalQueue.then(() => this._onSignal(msg.from, msg.data));
             break;
           case 'error':
@@ -78,19 +70,44 @@ export class Meeting {
 
   _signal(to, data) { this._send({ type: 'signal', to, data }); }
 
+  _capVideo(sender) {
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+    params.encodings[0].maxFramerate = this.lowPower ? 8 : 15;
+    params.encodings[0].maxBitrate = this.lowPower ? 250000 : 600000;
+    params.encodings[0].scaleResolutionDownBy = this.lowPower ? 2 : 1;
+    sender.setParameters(params).catch((e) => this.o.log?.(`Video cap not applied (${e.message}).`));
+  }
+
+  setLowPower(on) {
+    if (!!this.lowPower === !!on) return;
+    this.lowPower = !!on;
+    for (const p of this.peers.values()) {
+      if (p.videoSender && p.pc.connectionState === 'connected') this._capVideo(p.videoSender);
+    }
+    this.o.log?.(on ? 'Real readings on: sending lighter video to save CPU for the SDK.' : 'Video back to normal quality.');
+  }
+
   _createPeer(id, name, initiator) {
     if (this.peers.has(id)) return this.peers.get(id);
     const pc = new RTCPeerConnection(RTC_CONFIG);
-    const peer = { id, name, pc, dc: null, pendingCandidates: [] };
+    const peer = { id, name, pc, dc: null, pendingCandidates: [], videoSender: null };
     this.peers.set(id, peer);
     this.o.onPeerJoined?.(id, name);
 
-    for (const track of this.o.localStream.getTracks()) pc.addTrack(track, this.o.localStream);
+    const senders = this.o.localStream.getTracks().map((track) => pc.addTrack(track, this.o.localStream));
+    const videoSender = senders.find((x) => x.track?.kind === 'video');
+    peer.videoSender = videoSender || null;
+    let capped = false;
 
     pc.onicecandidate = (e) => { if (e.candidate) this._signal(id, { candidate: e.candidate }); };
     pc.ontrack = (e) => { if (e.streams[0]) this.o.onPeerStream?.(id, e.streams[0]); };
     pc.onconnectionstatechange = () => {
       this.o.log?.(`${name}: ${pc.connectionState}`);
+      if (pc.connectionState === 'connected' && videoSender && !capped) {
+        capped = true;
+        this._capVideo(videoSender);
+      }
     };
 
     if (initiator) {
@@ -141,7 +158,7 @@ export class Meeting {
   _removePeer(id) {
     const peer = this.peers.get(id);
     if (!peer) return;
-    try { peer.pc.close(); } catch { /* ignore */ }
+    try { peer.pc.close(); } catch {}
     this.peers.delete(id);
     this.o.onPeerLeft?.(id);
   }
@@ -158,7 +175,7 @@ export class Meeting {
 
   leave() {
     this.closed = true;
-    for (const peer of this.peers.values()) { try { peer.pc.close(); } catch { /* ignore */ } }
+    for (const peer of this.peers.values()) { try { peer.pc.close(); } catch {} }
     this.peers.clear();
     if (this.ws) this.ws.close();
   }

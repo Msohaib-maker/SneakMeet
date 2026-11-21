@@ -1,8 +1,5 @@
-// Simulated vitals with the same interface as VitalsMonitor. Used for
-// development and demos so testing doesn't consume SmartSpectra credits.
-// Every value it produces is flagged `simulated: true` and labelled in the UI.
-
 import { WARMUP, emptyFace } from './vitals.js';
+import { createExtra, simulateExtra } from './extra.js';
 
 export class SimulatedVitals {
   constructor({ onStatus, onUpdate, onStopped }) {
@@ -19,8 +16,9 @@ export class SimulatedVitals {
     this.cur = { ...this.base };
     this.event = null;
     this.face = emptyFace();
-    this.away = 0;        // seconds left of a simulated "looking away" spell
-    this.talk = 0;        // seconds left of a simulated talking spell
+    this.extra = createExtra();
+    this.away = 0;
+    this.talk = 0;
     this.mood = { neutral: 70, happy: 15, surprise: 5, sad: 4, angry: 2, fear: 2, disgust: 1, contempt: 1 };
     this.firstAt = Date.now();
     this.onStatus?.('Running (simulated)');
@@ -30,7 +28,6 @@ export class SimulatedVitals {
 
   _tick() {
     const elapsed = (Date.now() - this.firstAt) / 1000;
-    // Occasionally simulate a 20 s period of elevated pulse / faster breathing.
     if (!this.event && Math.random() < 0.015) this.event = { until: elapsed + 20, add: 8 + Math.random() * 10 };
     if (this.event && elapsed > this.event.until) this.event = null;
     const e = this.event;
@@ -40,11 +37,13 @@ export class SimulatedVitals {
     this.cur.hrv = walk(this.cur.hrv, this.base.hrv - (e ? 12 : 0), 2, 0.06);
 
     this._tickFace(e);
+    simulateExtra(this.extra, elapsed, this.cur.pulse, this.cur.breathing, elapsed >= WARMUP.hrv ? this.cur.hrv : null);
 
     this.onUpdate?.({
       elapsed,
       face: { ...this.face, expressions: { ...this.face.expressions } },
       simulated: true,
+      extra: this.extra,
       pulse: elapsed >= 3 ? this.cur.pulse : null,
       pulseStable: elapsed >= WARMUP.pulse,
       breathing: elapsed >= 5 ? this.cur.breathing : null,
@@ -62,10 +61,8 @@ export class SimulatedVitals {
     f.present = this.away === 0 || r() < 0.5;
     f.forward = f.present && this.away === 0;
     f.talking = f.present && this.talk > 0;
-    // ~12-20 blinks/min, fewer while staring at the screen.
     f.blinking = f.present && r() < (f.forward ? 0.22 : 0.32);
     if (f.blinking) f.blinks += 1;
-    // Expression scores drift; talking brings more happy/surprise.
     const target = { ...this.mood };
     if (f.talking) { target.happy += 20; target.surprise += 5; target.neutral -= 25; }
     if (event) { target.neutral -= 10; target.surprise += 5; target.fear += 5; }

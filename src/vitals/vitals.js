@@ -1,7 +1,3 @@
-// Thin wrapper around the SmartSpectra renderer SDK. Measures ONE person
-// (the local user) from the local camera stream. Everything is computed
-// on this device; only SDK auth/telemetry talks to Presage.
-
 import {
   SmartSpectraSDK,
   ProcessingStatus,
@@ -11,16 +7,15 @@ import {
   MetricType,
 } from '@smartspectra/node-sdk/renderer';
 import { decodeMetrics } from '@smartspectra/node-sdk/messages';
+import { createExtra, readExtra } from './extra.js';
 
 const nameMap = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [v, k.replace(/^k/, '')]));
 const STATUS_NAMES = nameMap(ProcessingStatus);
 const VALIDATION_NAMES = nameMap(ValidationCode);
 const last = (arr) => (arr && arr.length ? arr[arr.length - 1] : null);
 
-// Seconds of data each metric needs before it is meaningful (SDK docs).
 export const WARMUP = { pulse: 12, breathing: 30, hrv: 60 };
 
-// Face signals (no landmarks: we only need blink/talk/expression events).
 const FACE_METRICS = [MetricType.BLINKING, MetricType.TALKING, MetricType.EXPRESSIONS];
 export const EXPRESSIONS = ['neutral', 'happy', 'surprise', 'sad', 'angry', 'fear', 'disgust', 'contempt'];
 const EXPRESSION_BY_ID = { 1: 'angry', 2: 'contempt', 3: 'disgust', 4: 'fear', 5: 'happy', 6: 'neutral', 7: 'sad', 8: 'surprise' };
@@ -42,18 +37,21 @@ export class VitalsMonitor {
   async start(stream) {
     if (this.sdk) return;
     this.firstAt = null;
+    this.seen = new Set();
+    this.diagAt = 0;
+    this.diag = {};
     this.latest = {
       elapsed: 0,
-      pulse: null, pulseStable: false,
-      breathing: null, breathingStable: false,
+      pulse: null, pulseStable: false, pulseConf: null,
+      breathing: null, breathingStable: false, breathingConf: null,
       hrv: null, hrvStable: false,
       face: emptyFace(),
+      extra: createExtra(),
     };
 
     try {
       await this._startSdk(stream, true);
     } catch (err) {
-      // If face metrics aren't available on this key, fall back to vitals only.
       this.log?.(`Face signals unavailable (${err.message}); measuring vitals only.`);
       await this._startSdk(stream, false);
     }
@@ -69,7 +67,6 @@ export class VitalsMonitor {
 
     sdk.on('processingStatus', (status) => {
       this.onStatus?.(STATUS_NAMES[status] || `Status(${status})`, status);
-      // A terminal error drops every later frame; tear the session down.
       if (status === ProcessingStatus.kError) setTimeout(() => this.stop(), 0);
     });
     sdk.on('validationStatus', (code, _ts, hint) => {
@@ -81,14 +78,12 @@ export class VitalsMonitor {
     sdk.on('metrics', (buf) => this._onMetrics(buf));
     sdk.on('error', (code, message, retryable) => this.onError?.(code, message, retryable));
 
-    // Give the SDK a video-only view of the shared camera stream. The SDK
-    // never stops host-supplied tracks, so the call keeps its video.
     sdk.useMediaStream(new MediaStream(stream.getVideoTracks()));
     try {
       await sdk.start();
     } catch (err) {
       this.sdk = null;
-      try { sdk.destroy(); } catch { /* ignore */ }
+      try { sdk.destroy(); } catch {}
       if (!withFace) this.onStopped?.();
       throw err;
     }
@@ -102,12 +97,14 @@ export class VitalsMonitor {
     v.elapsed = (Date.now() - this.firstAt) / 1000;
 
     const br = last(m.breathing?.rate);
-    if (br) { v.breathing = Number(br.value); v.breathingStable = !!br.stable; }
+    if (br) { v.breathing = Number(br.value); v.breathingStable = !!br.stable; v.breathingConf = Number(br.confidence); this.diag.br = br.confidence; this._first('breathing', br); }
     const pr = last(m.cardio?.pulseRate);
-    if (pr) { v.pulse = Number(pr.value); v.pulseStable = !!pr.stable; }
-    // HRV confidence is 0 until its 60 s window has filled.
+    if (pr) { v.pulse = Number(pr.value); v.pulseStable = !!pr.stable; v.pulseConf = Number(pr.confidence); this.diag.pr = pr.confidence; this._first('pulse', pr); }
     const hrv = last(m.cardio?.hrv);
-    if (hrv && hrv.confidence > 0) { v.hrv = Number(hrv.rmssd); v.hrvStable = !!hrv.stable; }
+    if (hrv) { this.diag.hrv = hrv.confidence; this._first('hrv (any)', { value: hrv.rmssd, confidence: hrv.confidence, stable: hrv.stable }); }
+    if (hrv && hrv.confidence > 0) { v.hrv = Number(hrv.rmssd); v.hrvStable = !!hrv.stable; v.hrvConf = Number(hrv.confidence); this._first('hrv (confident)', { value: hrv.rmssd, confidence: hrv.confidence, stable: hrv.stable }); }
+
+    readExtra(v.extra, m);
 
     const face = m.face;
     if (face && !this.faceLogged && (face.blinking?.length || face.talking?.length || face.expression?.length)) {
@@ -117,7 +114,7 @@ export class VitalsMonitor {
     if (face) {
       const f = v.face;
       for (const b of face.blinking || []) {
-        if (b.detected && !f.blinking) f.blinks += 1; // count rising edges
+        if (b.detected && !f.blinking) f.blinks += 1;
         f.blinking = !!b.detected;
       }
       const t = last(face.talking);
@@ -130,10 +127,24 @@ export class VitalsMonitor {
           if (name) scores[name] = Number(sc.confidence) || 0;
         }
         f.expressions = scores;
+        this._first('expressions', { value: Object.keys(scores).length, stable: ex.stable });
       }
     }
 
+    if (Date.now() - this.diagAt > 15000) {
+      this.diagAt = Date.now();
+      const r = (x) => (Number.isFinite(x) ? Math.round(x * 10) / 10 : '-');
+      const topEx = v.face.expressions ? Object.entries(v.face.expressions).sort((a, b) => b[1] - a[1])[0] : null;
+      this.log?.(`[diag ${Math.round(v.elapsed)}s] pulse ${r(v.pulse)}${v.pulseStable ? ' stable' : ''} conf ${r(this.diag.pr)} · breathing ${r(v.breathing)}${v.breathingStable ? ' stable' : ''} conf ${r(this.diag.br)} · HRV ${r(v.hrv)} conf ${r(this.diag.hrv)} · face ${v.face.present ? 'yes' : 'no'}${v.face.forward ? '/forward' : ''} · expr ${topEx ? `${topEx[0]} ${r(topEx[1])}` : 'none'}`);
+    }
     this.onUpdate?.({ ...v, face: { ...v.face } });
+  }
+
+  _first(name, x) {
+    if (this.seen.has(name)) return;
+    this.seen.add(name);
+    const t = this.firstAt ? Math.round((Date.now() - this.firstAt) / 100) / 10 : 0;
+    this.log?.(`[diag] first ${name} at ${t}s: value ${Number(x.value).toFixed?.(1) ?? x.value}${x.confidence != null ? `, conf ${Number(x.confidence).toFixed(2)}` : ''}, ${x.stable ? 'stable' : 'not stable'}`);
   }
 
   async stop() {
@@ -141,7 +152,7 @@ export class VitalsMonitor {
     if (!sdk) return;
     this.sdk = null;
     try { await sdk.stop(); } catch (e) { this.log?.(`Vitals stop failed: ${e.message}`); }
-    try { sdk.destroy(); } catch { /* already destroyed */ }
+    try { sdk.destroy(); } catch {}
     this.onStopped?.();
   }
 }

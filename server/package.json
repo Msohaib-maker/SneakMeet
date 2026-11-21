@@ -1,7 +1,7 @@
 {
   "name": "presage-meet-server",
   "version": "1.0.0",
-  "description": "Signaling server for Presage Meet (relays WebRTC setup only; no media or vitals).",
+  "description": "Signaling server for BetterZoom (relays WebRTC setup only; no media or vitals).",
   "main": "signaling.js",
   "private": true,
   "license": "MIT",

@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; media-src 'self' blob: mediastream:; connect-src 'self' ws: wss: https://generativelanguage.googleapis.com; img-src 'self' data:;">
-  <title>Presage Meet</title>
+  <title>BetterZoom</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header>
-    <h1 class="brand"><span class="logo" aria-hidden="true"></span>PRESAGE<span class="brand-accent">MEET</span></h1>
+    <h1 class="brand"><span class="logo" aria-hidden="true"></span>BETTER<span class="brand-accent">ZOOM</span></h1>
     <div class="header-right">
       <span id="room-label" class="room-label" hidden></span>
       <span id="status" class="status">Vitals off</span>
@@ -86,13 +86,26 @@
       </section>
 
       <section class="spane" data-pane="ai" hidden>
-        <p class="help">Only used when <b>you are the host</b>. Turns consented participants' readings into short briefs every ~40 s. Names and video are never sent.</p>
+        <p class="help">Used by the Self mode coach and, when you host, for participant summaries (tap a bot). Names and video are never sent.</p>
         <label class="field">AI insights
           <select id="ai-provider">
             <option value="gemini">Gemini 3.5 Flash-Lite (needs key)</option>
             <option value="preview">Rule-based preview (no AI, offline)</option>
             <option value="off">Off</option>
           </select>
+        </label>
+        <label class="field">Bot personality
+          <select id="bot-persona">
+            <option value="normal">Normal: friendly coach</option>
+            <option value="rowdy">Humorous: rowdy cigar bot + meme faces</option>
+          </select>
+          <span class="help">Changes how the bot talks and looks (Self mode coach and host summaries). The advice stays the same.</span>
+        </label>
+        <label class="opt"><input id="bot-voice" type="checkbox">
+          <span><b>Bot reads messages aloud</b><small>Uses the voices built into Windows: offline, free. In meetings, use headphones so your mic doesn't pick it up.</small></span>
+        </label>
+        <label class="opt"><input id="show-bot" type="checkbox">
+          <span><b>Floating bot in meetings</b><small>Host only: the bot stands over the video area and reads out the summaries. Hide it with its ✕ at any time.</small></span>
         </label>
         <label class="field">Gemini API key
           <span class="row">
@@ -124,6 +137,27 @@
         </div>
       </div>
 
+      <div class="lobby-cards">
+      <div class="card practice-card">
+        <h2>Practice solo <span class="new-tag">Self mode</span></h2>
+        <p class="muted">Rehearse an interview, pitch or presentation with an AI host watching your readings: calm or anxious, expressions, and live tips. No meeting server, nobody else sees you.</p>
+        <label class="field">I'm practising
+          <select id="practice-scenario">
+            <option value="interview">Job interview</option>
+            <option value="pitch">Startup / sales pitch</option>
+            <option value="presentation">Presentation</option>
+            <option value="speech">Public speaking</option>
+            <option value="meeting">Difficult conversation</option>
+            <option value="custom">Something else</option>
+          </select>
+        </label>
+        <label class="field">Coach instructions <span class="optional">(optional)</span>
+          <textarea id="practice-instructions" rows="2" maxlength="600" placeholder="e.g. Senior frontend interview. Be blunt, focus on my nerves and pace."></textarea>
+        </label>
+        <button id="btn-practice" type="button">Start practice</button>
+        <div class="muted">With Gemini on (⚙ AI), the AI host receives only numbers, the scenario and your instructions every ~30 s: never your name, video or audio.</div>
+      </div>
+
       <div class="card">
         <h2>Join a meeting</h2>
         <label class="field">Your name <input id="name" maxlength="40" autocomplete="off"></label>
@@ -151,11 +185,82 @@
           </ul>
         </div>
       </div>
+      </div>
+    </section>
+
+    <!-- Practice (self mode) --------------------------------------------- -->
+    <section id="practice" class="practice" hidden>
+      <div class="practice-stage">
+        <div class="p-tiles">
+          <div id="practice-tile" class="tile self practice-tile">
+            <video id="practice-video" autoplay playsinline muted></video>
+            <div id="practice-title" class="tile-name"></div>
+            <div id="p-chip" class="state-chip" hidden></div>
+            <div id="p-expr" class="expr-chip" hidden></div>
+          </div>
+          <div class="tile p-bot-tile">
+            <div id="p-bot"></div>
+            <div class="tile-name"><span class="name-rowdy">Smokey · AI host</span><span class="name-normal">AI host</span></div>
+          </div>
+        </div>
+        <div class="p-botstage">
+          <div id="p-bubble" class="bot-bubble" hidden></div>
+        </div>
+        <div id="p-timeline" class="p-timeline"></div>
+        <div id="p-face" class="muted p-face"></div>
+        <div id="p-hint" class="hint-box">Starting readings…</div>
+      </div>
+
+      <aside class="side practice-side">
+        <div class="row">
+          <div class="panel-title">AI host · <span id="p-scenario"></span></div>
+          <span class="spacer"></span>
+          <span id="p-timer" class="p-timer">0:00</span>
+        </div>
+        <div id="p-vitals" class="p-vitals"></div>
+        <div id="p-gauge" class="p-gauge"></div>
+        <div class="row">
+          <div class="panel-title">Coach</div>
+          <span class="spacer"></span>
+          <button id="btn-p-coach" type="button" class="secondary small">Ask now</button>
+        </div>
+        <div id="p-coach-status" class="muted"></div>
+        <div id="p-coach" class="p-coach"></div>
+        <details id="p-more" class="p-more" open>
+          <summary>Breathing &amp; heart</summary>
+          <div class="p-wave">
+            <div class="label">🫁 Breathing movement <span class="p-legend"><i class="c"></i>chest <i class="b"></i>belly</span><span id="p-breath-note" class="p-wave-note"></span></div>
+            <canvas id="p-wave-breath"></canvas>
+          </div>
+          <div class="p-wave">
+            <div class="label">❤ Pulse waveform <span id="p-pulse-note" class="p-wave-note"></span></div>
+            <canvas id="p-wave-pulse"></canvas>
+          </div>
+          <div id="p-hrv-more" class="p-stats"></div>
+          <div id="p-hrv-note" class="muted p-wave-note"></div>
+        </details>
+        <div class="muted p-foot"><span id="p-credits"></span> · Camera-based wellness estimates, not a medical assessment.</div>
+      </aside>
+
+      <div class="toolbar">
+        <button id="btn-p-cam" type="button" class="tool on">Camera on</button>
+        <button id="btn-p-measure" type="button" class="tool on">Readings on</button>
+        <button id="btn-p-scan" type="button" class="tool" title="Decorative scanner on your video">◎ Scanner</button>
+        <button id="btn-p-recal" type="button" class="tool" title="Re-learn your resting baseline from the next readings">↻ Re-baseline</button>
+        <button id="btn-p-voice" type="button" class="tool" title="Bot reads its messages aloud">🔇 Voice off</button>
+        <button id="btn-p-end" type="button" class="danger">End session</button>
+      </div>
     </section>
 
     <!-- Meeting ---------------------------------------------------------- -->
     <section id="meeting" class="meeting" hidden>
       <div id="grid" class="grid"></div>
+      <div id="bot-overlay" class="bot-overlay" hidden>
+        <button id="btn-bot-hide" type="button" class="bot-hide" title="Hide the bot (bring it back from ⚙ AI)">✕</button>
+        <button id="btn-bot-voice" type="button" class="bot-hide bot-voice" title="Read summaries aloud">🔇</button>
+        <div id="bot-overlay-bubble" class="bot-bubble" hidden></div>
+        <div id="bot-overlay-bot"></div>
+      </div>
 
       <aside class="side">
         <div id="host-panel" class="host-panel" hidden>
@@ -168,12 +273,14 @@
           <div id="host-cards" class="host-cards"></div>
           <div class="muted">Only participants who consented. Wellness estimates, not a medical assessment.</div>
         </div>
+        <div id="my-vitals" class="my-vitals">
         <div class="panel-title">My vitals <span class="muted">· private unless shared</span></div>
         <div class="readout"><div class="label">Pulse</div><span id="v-pulse" class="value">—</span> <span class="unit">bpm</span></div>
         <div class="readout"><div class="label">Breathing</div><span id="v-breath" class="value">—</span> <span class="unit">/min</span></div>
         <div class="readout"><div class="label">HRV (RMSSD)</div><span id="v-hrv" class="value">—</span> <span class="unit">ms</span></div>
         <div id="hint" class="hint-box">Turn on <b>Measure</b> to start.</div>
         <div class="muted">Camera: <span id="cam-fps">— fps</span></div>
+        </div>
         <div class="panel-title">Log</div>
         <pre id="log" class="log"></pre>
       </aside>
@@ -195,7 +302,7 @@
       <h2 id="consent-title">The host is requesting wellness reports</h2>
       <p><b id="consent-host">The host</b> would like to receive a short wellness summary from you during this meeting.</p>
       <ul>
-        <li>If you agree, this app measures your pulse, breathing and HRV, plus face signals (face in frame, facing the screen, talking, blinking, expression scores), <b>on this laptop</b> from your camera.</li>
+        <li>If you agree, this app measures your pulse, breathing and HRV, plus face signals (face in frame, facing the screen, talking, blinking, expression scores), <b>on this laptop</b> from your camera. From these it estimates how you seem (<b>Calm, Steady, Tense or Anxious</b>), and the host sees that word next to your video.</li>
         <li>Your live readings (once per second) and a summary every ~25 seconds are sent <b>only to the host</b>, peer-to-peer. The host sees them next to your video; you and the others do not. No video frames are sent, and nothing is stored on a server.</li>
         <li>The host's app may send these numbers to Google's Gemini AI about every 40 seconds to write a short brief, including an engagement estimate. Your name and video are never sent, only an anonymous label (like “P1”) and the numbers. On Gemini's free tier, Google may use this data to improve its products.</li>
         <li>Everyone in the meeting sees a <b>“Reporting to host”</b> badge on your video while this is on.</li>
@@ -211,6 +318,19 @@
   </div>
 
   <div id="report-modal" class="modal" hidden></div>
+
+  <div id="practice-summary" class="modal" hidden>
+    <div class="modal-box summary-box" role="dialog" aria-modal="true" aria-labelledby="ps-title">
+      <h2 id="ps-title">Session debrief</h2>
+      <div id="ps-body" class="ps-body">Writing your debrief…</div>
+      <div class="row">
+        <button id="btn-ps-download" type="button" class="secondary">Download (.md)</button>
+        <span class="spacer"></span>
+        <button id="btn-ps-again" type="button" class="secondary">Practice again</button>
+        <button id="btn-ps-close" type="button">Back to lobby</button>
+      </div>
+    </div>
+  </div>
 
   <footer>Wellness/demo use only, not a medical device. Vitals are computed on-device by the Presage SmartSpectra SDK.</footer>
 

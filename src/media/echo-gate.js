@@ -1,17 +1,9 @@
-// Speakerphone-style echo suppression on top of the browser's echo canceller.
-//
-// Laptop speakers + laptop mic (no headphones) can leak the other side's voice
-// back into the call even with echoCancellation on. This gate lowers YOUR
-// outgoing mic while someone else is talking and you are not clearly talking
-// louder over them (half-duplex, like a conference phone). It works only on
-// audio levels on this laptop; nothing is recorded or sent anywhere.
-
 const TICK_MS = 30;
-const REMOTE_ACTIVE = 0.012;   // RMS above which a remote voice counts as "talking"
-const DUCK_GAIN = 0.08;        // mic level while ducked
-const HOLD_MS = 350;           // keep ducking briefly after the remote voice stops
-const BARGE_IN = 2.2;          // you must be this much louder than the remote to talk over them
-const BARGE_MIN = 0.03;        // ...and at least this loud
+const REMOTE_ACTIVE = 0.012;
+const DUCK_GAIN = 0.08;
+const HOLD_MS = 350;
+const BARGE_IN = 2.2;
+const BARGE_MIN = 0.03;
 
 function rms(analyser, buf) {
   analyser.getFloatTimeDomainData(buf);
@@ -31,8 +23,8 @@ export class EchoGate {
     const dest = this.ctx.createMediaStreamDestination();
     src.connect(this.micAnalyser);
     src.connect(this.gain).connect(dest);
-    this.track = dest.stream.getAudioTracks()[0]; // send this one to peers
-    this.remotes = new Map(); // streamId -> { src, analyser }
+    this.track = dest.stream.getAudioTracks()[0];
+    this.remotes = new Map();
     this.buf = new Float32Array(512);
     this.enabled = true;
     this.lastRemote = 0;
@@ -46,7 +38,7 @@ export class EchoGate {
     const src = this.ctx.createMediaStreamSource(stream);
     const analyser = this.ctx.createAnalyser();
     analyser.fftSize = 512;
-    src.connect(analyser); // analysis only: playback stays on the <video> element
+    src.connect(analyser);
     this.remotes.set(stream.id, { src, analyser });
   }
 
@@ -65,7 +57,6 @@ export class EchoGate {
   _setGain(g) {
     const t = this.ctx.currentTime;
     this.gain.gain.cancelScheduledValues(t);
-    // fast attack when ducking, gentler release so words aren't clipped
     this.gain.gain.setTargetAtTime(g, t, g < 1 ? 0.015 : 0.06);
   }
 

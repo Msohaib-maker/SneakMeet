@@ -1,80 +1,138 @@
-# Presage Meet
+# BetterZoom
 
-Desktop video meetings (Windows, Electron) where participants can **opt in** to camera-based
-wellness readings with the [Presage SmartSpectra SDK](https://smartspectra.presagetech.com/docs/nodejs),
-and a meeting **host** (a team lead, coach or clinician) can receive consented wellness reports with
-short AI briefs.
+A Windows desktop app (Electron) for **solo practice** and **video meetings** with opt-in, camera-based
+wellness readings from the [Presage SmartSpectra SDK](https://smartspectra.presagetech.com/docs/nodejs)
+and AI coaching from Google Gemini.
 
 Built for the [DEV.to Presage SmartSpectra SDK Challenge](https://dev.to/challenges/presage-2026-11-04).
 
 > Wellness information only. Not a medical device; no diagnosis.
 
-## Features
+BetterZoom is split into **two modules**:
 
-- **Meetings:** peer-to-peer video and audio for up to 6 people per room (WebRTC).
-- **On-device vitals:** pulse, breathing rate and HRV (RMSSD) from each person's own camera, plus face
-  signals (face in frame, facing the screen, talking, blinks, expression scores). Everything is computed
-  on that person's laptop by the SmartSpectra SDK.
-- **Lobby scan:** a private HUD over your own preview to check lighting and readings before joining.
-- **Scanner effect:** an optional decorative grid and scan line on your own meeting tile (only you see
-  it, no readings). Toggle it with **◎ Scanner** in the toolbar.
-- **Echo suppression** for laptop speakers: lowers your mic while someone else is talking, on top of the
-  browser's echo canceller (⚙ Settings → Camera & audio; turn off with headphones for full two-way talk).
-- **Host dashboard** (with consent): a compact report card per participant, a small scan readout on their
-  video (visible to the host only), full reports with trend charts, and CSV/Markdown downloads.
-- **"Pixel", the AI analyst:** every ~40 s the host's app turns the latest reports into a short brief
-  per person (headline, summary, engagement estimate with reasons) using Google Gemini.
-- **Simulated vitals** for demos and development, so testing doesn't spend SDK credits. Always labelled
-  **SIMULATED**.
+| Module | Who it's for | What it does |
+|---|---|---|
+| **Self mode** ("Practice solo") | One person, alone | Practise an interview, pitch, presentation or speech in front of your camera. An AI host watches your readings and coaches you live. |
+| **Meetings** | 2–6 people, peer-to-peer | Normal video meetings. Participants can opt in to share wellness readings with the meeting host, who gets a minimal dashboard and on-demand AI summaries. |
 
-## Download (Windows)
+Both modules use the same on-device readings from the SmartSpectra SDK: pulse, breathing rate, HRV,
+breathing and pulse waveforms, heart-rhythm figures (average beat gap, SDNN, stress index), and face
+signals (face in frame, facing the screen, talking, blinks, expressions).
 
-1. Download `Presage-Meet-Setup-<version>.exe` from the
+## Module 1: Self mode
+
+Open it from the lobby card **Practice solo**: pick a scenario (job interview, pitch, presentation,
+public speaking, difficult conversation, or your own) and optionally add coaching instructions.
+
+- **Your camera and the AI host side by side**, like a two-person call.
+- **Three readings** (pulse, breathing, HRV), each compared with *your own* usual.
+- **Calm meter:** Calm / Steady / Tense / Anxious, computed on your laptop from pulse and breathing
+  against your own baseline, with the reason shown ("Pulse 74, near your baseline").
+- **Breathing & heart:** live chest/belly breathing waves, pulse waveform, and heart-rhythm figures.
+- **AI coach (Gemini):** every 30 s (or **Ask now**) it turns your numbers into one practical tip.
+  The bot only speaks what Gemini writes; if Gemini is unavailable it says it will get back to you.
+- **Debrief** at the end (headline, summary, strengths, things to work on, timeline), downloadable as
+  Markdown.
+- **Bot personality** (⚙ AI): *Normal* friendly coach, or *Humorous*: "Smokey", a rowdy cigar-chomping
+  boxing-coach robot with meme faces for your expressions. Same advice, different delivery.
+- **Voice:** the bot can read its messages aloud (Windows built-in voices, offline). Toggle **🔊 Voice**.
+
+## Module 2: Meetings
+
+Enter your name and a room code (share it with the others) and join. Tick **Join as host** to receive
+wellness reports.
+
+- **Video and audio** for up to 6 people per room (WebRTC, peer-to-peer).
+- **Consent first:** when a meeting has a host, each participant is asked whether to send wellness
+  reports to the host. Everyone sees a **Reporting to host** badge on a consenting participant's video,
+  and they can stop at any time with **Report to host**.
+- **Host dashboard (minimal by default):** one line per participant (Calm / Steady / Tense / Anxious) on
+  their tile and card. Tap the participant's **bot** for a 3–4 line Gemini summary; tap **›** for the full
+  report (trend charts, heart rhythm & breathing, engagement signals, expressions). CSV and Markdown
+  downloads.
+- **Floating bot** (host): stands over the video area and reads summaries out. Hide it with ✕.
+- **My vitals:** each participant can measure privately, or **Share** live values with the room.
+- Lobby scan, a decorative scanner on your own tile, and echo suppression for laptop speakers.
+
+## Download and setup (Windows)
+
+1. Download `BetterZoom-Setup-<version>.exe` from the
    [Releases page](https://github.com/Msohaib-maker/SneakMeet/releases) and run it.
    The installer is not code-signed, so Windows SmartScreen may warn you: choose
    **More info → Run anyway**.
 2. Open **⚙ Settings** (or click the **Vitals:** chip in the lobby):
    - **Vitals:** choose **Real readings** and paste a SmartSpectra API key (free at
      https://physiology.presagetech.com/auth/register), or **Simulated** to try the app without one.
-     The lobby chip always shows which mode you're in.
-   - **AI briefs** (host only, optional): a Gemini API key from https://aistudio.google.com/apikey,
-     or **Rule-based preview (no AI)**.
-   - **Meeting:** the `wss://…` address of the signaling server. Everyone in a meeting must use the same one.
-3. Enter your name and a room code (share it with the others) and join. Tick **Join as host** to receive
-   wellness reports.
+     Simulated values are labelled **SIMULATED** everywhere.
+   - **AI:** a Gemini API key from https://aistudio.google.com/apikey (used by the Self mode coach and
+     the host's summaries), the bot personality, and voice.
+   - **Meeting:** the `wss://…` address of the signaling server. Everyone in a meeting must use the same
+     one. The default is the project's public server.
+3. **Self mode:** pick a scenario and press **Practice solo**. **Meetings:** enter a name and room code
+   and press **Join**.
 
-The installer contains **no API keys**. Each user enters their own.
+The installer contains **no API keys**. Each user enters their own. SmartSpectra usage is billed in
+credits (1 credit = 30 s of measuring); measuring only runs while readings are on.
 
 ## Run from source
 
-Requires Node.js 22+ (on Node 20, if Electron's binary is missing after install, run
-`node node_modules/electron/install.js`).
+Requires Node.js 20+ on Windows (the SmartSpectra native library used here is win32-x64). On Node 20, if
+Electron's binary is missing after install, run `node node_modules/electron/install.js`.
 
 ```
+git clone https://github.com/Msohaib-maker/SneakMeet.git
+cd SneakMeet
 npm install
-npm run server        # terminal 1: signaling server on ws://localhost:8787
-npm start             # terminal 2: the app
-npm run start:second  # optional: a second window to test a meeting alone (audio off, placeholder video)
+copy .env.example .env   # optional: put your keys here instead of in ⚙ Settings
+npm start                # builds and opens the app
 ```
 
-Keys can go in ⚙ Settings or in a `.env` file (see `.env.example`):
+Optional:
+
+```
+npm run server        # local signaling server on ws://localhost:8787 (then set it in ⚙ Meeting)
+npm run start:second  # a second window to test a meeting alone (audio off)
+npm run sdk-test      # SDK metric test page (development only, uses credits)
+```
+
+`.env` keys (all optional, never committed):
 
 ```
 SMARTSPECTRA_API_KEY=...
 GEMINI_API_KEY=...
-MEET_SERVER_URL=wss://your-server.example.com   # optional default meeting server
+MEET_SERVER_URL=wss://your-server.example.com   # default meeting server
 ```
 
-Build the Windows installer with `npm run dist` (output in `release/`). Release builds never include the
-Gemini key, and include the SmartSpectra key only if `RELEASE_INCLUDE_SMARTSPECTRA_KEY=1` is set.
-`MEET_SERVER_URL` from `.env` becomes the default meeting server.
+**Build the installer:** `npm run dist` (output: `release/BetterZoom-Setup-<version>.exe`). Release
+builds never include the Gemini key, and include the SmartSpectra key only if
+`RELEASE_INCLUDE_SMARTSPECTRA_KEY=1` is set.
+
+Testing a meeting on one laptop runs two app windows plus the SDK at once and can trigger
+"frame rate too low"; a real meeting (one person per computer) doesn't have that load. For best
+readings use Windows **Power mode → Best performance**.
+
+### Project structure
+
+```
+main.js            Electron main process (window, permissions, SDK native bridge)
+index.html, styles.css
+src/app/           renderer entry (index.js), lobby, settings, toolbar, meeting join/leave, consent
+src/practice/      Self mode: session, live view, breathing & heart panel, debrief export
+src/host/          Meetings host: dashboard, report window, AI summary panel
+src/meeting/       WebRTC mesh and signaling client
+src/vitals/        SmartSpectra wrapper, simulated vitals, calm meter, 25 s reports, waveforms
+src/ai/            Gemini client, host summaries, Self mode coach
+src/ui/            bot (body, voice, persona), meme faces, scan overlay, waveform drawing
+src/media/         camera, microphone, echo suppression
+server/            signaling server (Node + ws), Fly.io config
+sdk-test/          SDK metric test page (development only)
+```
 
 ### Testing switches (development only)
 
-These environment variables exist for automated testing and are not reachable from the app UI:
-`MEET_PROFILE` (separate second instance), `MEET_AUTOJOIN=room:name[:host]`, `MEET_AUTOCONSENT=1`
-(auto-accepts the consent dialog in a test instance), `MEET_SIMULATED=0|1`, `MEET_SHOTS=<dir>` (saves UI
-screenshots).
+Environment variables for automated testing, not reachable from the app UI: `MEET_PROFILE` (separate
+second instance), `MEET_AUTOJOIN=room:name[:host]`, `MEET_AUTOCONSENT=1`, `MEET_AUTOPRACTICE=1`,
+`MEET_PERSONA=rowdy`, `MEET_SIMULATED=0|1`, `MEET_SHOTS=<dir>` (saves UI screenshots).
 
 ## Deploy the meeting server
 
@@ -94,10 +152,15 @@ public STUN only.
 ## How it works
 
 ```
+ SELF MODE (one laptop)
+ camera → SmartSpectra SDK → readings + calm meter → AI host ──► Google Gemini
+                              (all on-device)                    (anonymous numbers only)
+
+ MEETINGS
  Participant laptop                          Host laptop
  ┌────────────────────────────┐             ┌──────────────────────────────┐
  │ camera → SmartSpectra SDK  │  WebRTC     │ dashboard, report cards       │
- │ (on-device vitals + face)  │ ──────────► │ Pixel AI ──► Google Gemini    │
+ │ (on-device vitals + face)  │ ──────────► │ bot summary ──► Google Gemini │
  │ consent dialog, badge      │ peer-to-peer│ (anonymised numbers only)     │
  └────────────────────────────┘             └──────────────────────────────┘
               ▲  connection setup only (no media, no vitals)  ▲
@@ -127,10 +190,12 @@ public STUN only.
   media, vitals or reports, and stores nothing.
 - **STUN** (`stun.l.google.com`) is used only to discover network addresses for peer connections.
 
-**AI processing (optional, host side)**
-- If the host enables Gemini, the host's app sends the recent report numbers of consenting
-  participants to Google's Gemini API about every 40 s. Participants are identified only as `P1`, `P2`…;
-  **names and video are never sent**. The full report shows exactly what is sent ("Data sent to …").
+**AI processing (optional)**
+- **Self mode:** with Gemini selected, your own recent numbers (no video, no name) are sent to Google's
+  Gemini API every 30 s, when you press **Ask now**, and once for the debrief.
+- **Meetings:** when the host taps a participant's bot, the host's app sends that participant's recent
+  report numbers to Gemini. Participants are identified only as `P1`, `P2`…; **names and video are never
+  sent**; the real name is put back on the host's laptop. The full report shows exactly what is sent.
 - On Gemini's free tier, Google may use submitted data to improve its products; participants are told
   this in the consent dialog. Hosts can choose **Rule-based preview** (local, no network) or **Off**.
 

@@ -1,14 +1,15 @@
 {
-  "name": "presage-meet",
+  "name": "betterzoom",
   "version": "1.0.0",
   "private": true,
-  "description": "Desktop video meetings with opt-in, on-device vitals powered by the Presage SmartSpectra SDK.",
+  "description": "BetterZoom: desktop video meetings and solo practice with opt-in, on-device vitals powered by the Presage SmartSpectra SDK.",
   "main": "main.js",
   "scripts": {
     "build": "node build.mjs",
     "start": "npm run build && electron .",
     "server": "node server/signaling.js",
     "start:second": "npm run build && cross-env MEET_PROFILE=2 electron .",
+    "sdk-test": "npm run build && cross-env MEET_SDK_TEST=1 electron .",
     "debug": "npm run build && cross-env SMARTSPECTRA_DIAGNOSTICS=1 electron .",
     "dist": "cross-env RELEASE=1 node build.mjs && electron-builder --win"
   },
@@ -22,7 +23,7 @@
     "electron-builder": "^26.18.0",
     "esbuild": "^0.25.0"
   },
-  "productName": "Presage Meet",
+  "productName": "BetterZoom",
   "author": "Msohaib-maker",
   "license": "MIT",
   "repository": {
@@ -30,8 +31,8 @@
     "url": "https://github.com/Msohaib-maker/SneakMeet.git"
   },
   "build": {
-    "appId": "io.github.msohaib-maker.presagemeet",
-    "productName": "Presage Meet",
+    "appId": "io.github.msohaib-maker.betterzoom",
+    "productName": "BetterZoom",
     "directories": {
       "output": "release"
     },
@@ -40,6 +41,7 @@
       "index.html",
       "styles.css",
       "dist/**/*",
+      "!dist/sdk-test.bundle.js",
       "package.json",
       "!node_modules/@smartspectra/node-sdk-*/**",
       "!node_modules/ws/**"
@@ -63,7 +65,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Presage-Meet-Setup-${version}.exe"
+      "artifactName": "BetterZoom-Setup-${version}.exe"
     }
   }
 }

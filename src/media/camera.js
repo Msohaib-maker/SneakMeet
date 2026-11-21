@@ -1,12 +1,8 @@
-// Camera helpers: open a webcam mode that sustains >= 25 fps (the SDK minimum),
-// optional exposure lock / brightness, a placeholder stream, and an fps meter.
-
 export async function listCameras() {
-  // Device labels are only visible after a permission grant; do a quick probe.
   try {
     const probe = await navigator.mediaDevices.getUserMedia({ video: true });
     probe.getTracks().forEach((t) => t.stop());
-  } catch { /* no camera or denied; enumerate anyway */ }
+  } catch {}
   const devices = await navigator.mediaDevices.enumerateDevices();
   return devices.filter((d) => d.kind === 'videoinput');
 }
@@ -34,15 +30,12 @@ export async function openCamera({ deviceId, resolution, lockExposure, log }) {
   return stream;
 }
 
-// Auto-exposure lengthens exposure in dim light, which caps the frame rate.
-// Force the longest manual exposure that still fits in one 1/30 s frame.
 async function applyExposureLock(track, log) {
   const caps = track.getCapabilities ? track.getCapabilities() : {};
   if (!caps.exposureMode || !caps.exposureMode.includes('manual') || !caps.exposureTime) {
     log('Exposure lock not supported by this camera.');
     return;
   }
-  // Chromium exposureTime is in 100 µs units; 1/30 s = 333.
   const { min, max, step = 1 } = caps.exposureTime;
   const limit = Math.min(max, 333);
   const target = Math.max(min, min + Math.floor((limit - min) / step) * step);
@@ -51,7 +44,6 @@ async function applyExposureLock(track, log) {
   } catch (e) { log(`Exposure lock failed: ${e.message}`); }
 }
 
-// Wire a range input to the camera's brightness control, if supported.
 export function setupBrightness(track, { slider, wrap, saved, onSave }) {
   const caps = track.getCapabilities ? track.getCapabilities() : {};
   if (!caps.brightness) { wrap.hidden = true; return; }
@@ -68,8 +60,6 @@ export function setupBrightness(track, { slider, wrap, saved, onSave }) {
   };
 }
 
-// Animated test-pattern stream, used when no camera is available
-// (e.g. a second app window on the same laptop while the webcam is in use).
 export function createPlaceholderStream(label) {
   const canvas = document.createElement('canvas');
   canvas.width = 640;
@@ -81,7 +71,7 @@ export function createPlaceholderStream(label) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#e3635f';
     ctx.beginPath();
-    ctx.arc(320 + Math.sin(t / 30) * 120, 160, 36, 0, Math.PI * 2);
+    ctx.arc(320 + Math.sin(t / 5) * 120, 160, 36, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#e6e8ef';
     ctx.font = '22px Segoe UI, sans-serif';
@@ -90,8 +80,8 @@ export function createPlaceholderStream(label) {
     t++;
   };
   draw();
-  const timer = setInterval(draw, 1000 / 30);
-  const stream = canvas.captureStream(30);
+  const timer = setInterval(draw, 200);
+  const stream = canvas.captureStream(5);
   stream.cleanup = () => clearInterval(timer);
   return stream;
 }
@@ -115,7 +105,6 @@ export async function openMic(log) {
   }
 }
 
-// Count frames actually rendered by a <video>; calls onFps once per second.
 export function startFpsMeter(video, onFps) {
   let frames = 0;
   let active = true;

@@ -1,6 +1,4 @@
-// Futuristic "scan" HUD drawn over a video: face reticle, sweeping scan line,
-// and per-metric lock-on progress while vitals are being measured.
-import { WARMUP } from './vitals.js';
+import { WARMUP } from '../vitals/vitals.js';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -16,10 +14,6 @@ const METRICS = [
 ];
 
 export class ScanOverlay {
-  // compact: host view of a participant: corners + a small corner readout only,
-  // nothing drawn across the face.
-  // ambient: decorative only (grid + sweeping line + corners) for your own
-  // meeting tile. Shows no readings and no text.
   constructor(container, { compact = false, ambient = false } = {}) {
     this.compact = compact;
     this.ambient = ambient;
@@ -57,9 +51,19 @@ export class ScanOverlay {
     container.appendChild(this.root);
   }
 
-  // s: { measuring, simulated, my }   my = latest vitals update or null
-  update({ measuring, simulated, my }) {
+  update({ measuring, simulated, my, calm }) {
     if (this.ambient) return;
+    if (this.compact) {
+      this.bars.hidden = false;
+      for (const r of Object.values(this.rows)) r.row.hidden = true;
+      this.root.classList.toggle('idle', false);
+      const sim = simulated ? ' · SIM' : '';
+      this.title.className = `scan-title hud-state ${measuring && calm ? calm.id : ''}`;
+      this.title.textContent = !measuring ? 'NOT MEASURING'
+        : my?.face && !my.face.present ? 'NO FACE'
+          : calm ? `● ${calm.label.toUpperCase()}${sim}` : `READING…${sim}`;
+      return;
+    }
     const elapsed = my?.elapsed ?? 0;
     const locked = measuring && METRICS.every(([key, , w]) => my?.[key] != null && elapsed >= w);
     this.root.classList.toggle('idle', !measuring);

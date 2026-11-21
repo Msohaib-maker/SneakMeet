@@ -1,4 +1,4 @@
-// Builds the periodic summary a consenting participant sends to the host.
+import { movementShare } from './extra.js';
 
 export const REPORT_INTERVAL_MS = 25000;
 
@@ -14,7 +14,6 @@ export class ReportBuilder {
     this.lastBlinks = null;
   }
 
-  // Record at most one sample per second.
   add(v) {
     const now = Date.now();
     if (now - this.lastSampleAt < 1000) return;
@@ -50,12 +49,22 @@ export class ReportBuilder {
       hrv: hrvVals.length ? round1(hrvVals[hrvVals.length - 1]) : null,
       quality: s.length ? Math.round((100 * stable) / s.length) : 0,
       trend: { pulse: delta(pulse, 'pulse'), breathing: delta(breathing, 'breathing') },
+      ...this._extra(s),
     };
     if (pulse || breathing) this.prev = report;
     return report;
   }
 
-  // Face/engagement summary: % of samples, blink rate, mean expression scores.
+  _extra(s) {
+    const x = s.length ? s[s.length - 1].extra : null;
+    if (!x) return { heart: null, breathStyle: null };
+    const r = (n) => (Number.isFinite(n) ? Math.round(n) : null);
+    const heart = x.meanNn ? { beatGapMs: r(x.meanNn), sdnnMs: r(x.sdnn), stressIndex: r(x.baevsky), confident: !!x.hrvOk } : null;
+    const share = x.breathOk ? movementShare(x) : null;
+    const breathStyle = share == null ? null : share > 0.55 ? 'belly' : share < 0.4 ? 'chest' : 'mixed';
+    return { heart, breathStyle };
+  }
+
   _face(s) {
     const faces = s.map((x) => x.face).filter(Boolean);
     if (!faces.length) return null;

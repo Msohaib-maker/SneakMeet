@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:">
+<title>SDK Metric Test</title>
+<style>
+  :root { --bg:#101218; --panel:#181b24; --line:#2a2f3d; --text:#e6e8ee; --dim:#8a90a2; --ok:#3ecf8e; --warn:#f5b041; --bad:#ef5b5b; --acc:#5b8def; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 system-ui, sans-serif; }
+  header { display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:15px; margin:0 8px 0 0; }
+  button { background:var(--acc); color:#fff; border:0; border-radius:6px; padding:6px 12px; cursor:pointer; font:inherit; }
+  button.secondary { background:#2c3242; }
+  button:disabled { opacity:.45; cursor:default; }
+  input[type=password], input[type=text], select { background:#0c0e13; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font:inherit; }
+  main { display:grid; grid-template-columns: 300px 1fr; gap:12px; padding:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin:0 0 8px; }
+  video { width:100%; border-radius:6px; background:#000; transform:scaleX(-1); aspect-ratio:16/9; object-fit:cover; }
+  .group { margin-bottom:8px; }
+  .group b { display:block; font-size:12px; margin:6px 0 2px; color:var(--dim); }
+  .group label { display:block; padding:1px 0; }
+  .pill { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; background:#2c3242; color:var(--dim); }
+  .pill.ok { background:rgba(62,207,142,.15); color:var(--ok); }
+  .pill.warn { background:rgba(245,176,65,.15); color:var(--warn); }
+  .pill.bad { background:rgba(239,91,91,.15); color:var(--bad); }
+  #cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap:8px; }
+  .card { background:#0f1117; border:1px solid var(--line); border-radius:6px; padding:8px; min-height:74px; }
+  .card.seen { border-color:rgba(62,207,142,.45); }
+  .card .t { display:flex; justify-content:space-between; gap:6px; font-size:11px; color:var(--dim); }
+  .card .v { font-size:20px; font-weight:600; margin:2px 0; word-break:break-word; }
+  .card .s { font-size:11px; color:var(--dim); }
+  .card canvas { width:100%; height:34px; display:block; margin-top:4px; }
+  .bars div { display:flex; align-items:center; gap:6px; font-size:11px; }
+  .bars span { width:58px; color:var(--dim); }
+  .bars i { display:block; height:7px; background:var(--acc); border-radius:3px; }
+  #log { height:170px; overflow:auto; font:11px/1.45 ui-monospace, Consolas, monospace; white-space:pre-wrap; background:#0c0e13; border-radius:6px; padding:6px; }
+  .stat { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; }
+  .stat b { font-size:16px; display:block; }
+  .row { display:flex; gap:6px; align-items:center; margin:6px 0; flex-wrap:wrap; }
+  #insight-out { white-space:pre-wrap; font-size:12px; background:#0c0e13; border-radius:6px; padding:6px; min-height:40px; max-height:160px; overflow:auto; }
+  .warnbox { color:var(--warn); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SmartSpectra metric test (temporary)</h1>
+  <input id="key" type="password" placeholder="SmartSpectra API key" size="34">
+  <label>Auto-stop after
+    <select id="cap">
+      <option value="30">30 s (1 credit)</option>
+      <option value="60">60 s (2 credits)</option>
+      <option value="90" selected>90 s (3 credits)</option>
+      <option value="120">120 s (4 credits)</option>
+    </select>
+  </label>
+  <button id="start">Start</button>
+  <button id="stop" class="secondary" disabled>Stop</button>
+  <button id="export" class="secondary">Copy report</button>
+  <span id="status" class="pill">Idle</span>
+  <span id="hint" class="pill">-</span>
+</header>
+<main>
+  <div>
+    <div class="panel"><video id="video" autoplay muted playsinline></video></div>
+    <div class="panel" style="margin-top:12px">
+      <h2>Requested metrics</h2>
+      <div class="row">
+        <button class="secondary" id="sel-all">All</button>
+        <button class="secondary" id="sel-core">Core</button>
+        <button class="secondary" id="sel-none">None</button>
+      </div>
+      <div id="metric-list"></div>
+      <p class="warnbox">If start fails with <i>MetricNotAuthorized</i>, that metric isn't in your plan: untick it and start again.</p>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <div class="stat">
+        <div><b id="elapsed">0.0 s</b>measured this run</div>
+        <div><b id="credits">0</b>credits used this run (est.)</div>
+        <div><b id="session-credits">0</b>credits used since page opened (est.)</div>
+        <div><b id="frames">0</b>metrics packets</div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <h2>Readings (green border = data received)</h2>
+      <div id="cards"></div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <h2>LLM insight (requestInsight)</h2>
+      <div class="row">
+        <input id="insight-q" type="text" size="50" value="Summarise my breathing and pulse so far.">
+        <button id="insight" class="secondary" disabled>Ask</button>
+      </div>
+      <div id="insight-out"></div>
+    </div>
+    <div class="panel" style="margin-top:12px">
+      <h2>Log</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</main>
+<script src="../dist/sdk-test.bundle.js"></script>
+</body>
+</html>

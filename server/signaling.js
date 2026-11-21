@@ -1,24 +1,18 @@
 'use strict';
-// Minimal WebRTC signaling server for Presage Meet.
-// It only relays connection offers/answers between participants in a room
-// and tracks who the room's host is. Video, audio, vitals and reports never
-// pass through it (they go peer-to-peer).
 
 const os = require('os');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 
 const PORT = Number(process.env.PORT) || 8787;
-const MAX_PER_ROOM = 6; // full-mesh WebRTC; keep rooms small
+const MAX_PER_ROOM = 6;
 
-// Plain HTTP answers health checks from hosting platforms (Render, Railway…);
-// WebSocket upgrades on the same port carry the signaling.
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Presage Meet signaling server is running.\n');
+  res.end('BetterZoom signaling server is running.\n');
 });
 const wss = new WebSocketServer({ server, maxPayload: 256 * 1024 });
-const rooms = new Map(); // room -> { members: Map<id, { ws, name }>, hostId }
+const rooms = new Map();
 let nextId = 1;
 
 const send = (ws, msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)); };
@@ -43,7 +37,6 @@ wss.on('connection', (ws) => {
 
       const name = clean(msg.name, 40) || 'Guest';
       id = String(nextId++);
-      // First participant asking to host becomes host; later requests join as participants.
       if (msg.host === true && !room.hostId) room.hostId = id;
 
       send(ws, {
@@ -78,7 +71,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Drop dead connections so "peer-left" is delivered.
 setInterval(() => {
   for (const ws of wss.clients) {
     if (!ws.isAlive) { ws.terminate(); continue; }
@@ -91,6 +83,6 @@ server.listen(PORT, '0.0.0.0');
 
 const lan = Object.values(os.networkInterfaces()).flat()
   .filter((a) => a && a.family === 'IPv4' && !a.internal).map((a) => a.address);
-console.log(`Presage Meet signaling server on port ${PORT}`);
+console.log(`BetterZoom signaling server on port ${PORT}`);
 console.log(`  this machine:  ws://localhost:${PORT}`);
 for (const ip of lan) console.log(`  other devices: ws://${ip}:${PORT}`);
