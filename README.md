@@ -56,10 +56,10 @@ wellness reports.
 
 ## Download and setup (Windows)
 
-1. Download `BetterZoom-Setup-<version>.exe` from the
-   [Releases page](https://github.com/Msohaib-maker/SneakMeet/releases) and run it.
-   The installer is not code-signed, so Windows SmartScreen may warn you: choose
-   **More info → Run anyway**.
+1. **[Download BetterZoom-Setup-1.0.0.exe](https://github.com/Msohaib-maker/SneakMeet/releases/latest/download/BetterZoom-Setup-1.0.0.exe)**
+   (Windows 10/11, x64, ~147 MB; also on the [Releases page](https://github.com/Msohaib-maker/SneakMeet/releases))
+   and run it. The installer is not code-signed, so Windows SmartScreen may warn you: choose
+   **More info → Run anyway**. Then open **BetterZoom** from the Start menu.
 2. That's it: **no API keys needed.** The BetterZoom server provides the SmartSpectra and Gemini access.
    Optional, in **⚙ Settings**:
    - **Vitals:** **Real readings** (default) or **Simulated** (demo numbers, labelled **SIMULATED**
