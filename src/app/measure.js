@@ -1,3 +1,4 @@
+import { fetchSdkKey } from "../ai/server.js";
 import { els } from "./dom.js";
 import { openSettings } from "./settings.js";
 import { log, state } from "./state.js";
@@ -16,12 +17,16 @@ import { VitalsMonitor } from "../vitals/vitals.js";
 
 export async function startMeasuring() {
   const simulated = els.simulated.checked;
-  const apiKey = els.apiKey.value.trim();
+  let apiKey = els.apiKey.value.trim();
   if (!simulated) {
     if (!apiKey) {
-      openSettings("vitals");
-      log("Set your SmartSpectra API key in Settings first.");
-      return;
+      try {
+        apiKey = await fetchSdkKey();
+      } catch (e) {
+        openSettings("vitals");
+        log(`No SmartSpectra key: the server could not provide one (${e.message}). Add your own in Settings.`);
+        return;
+      }
     }
     if (state.placeholder) {
       log(

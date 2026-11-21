@@ -1,3 +1,4 @@
+import { serverBase } from './server.js';
 export const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
@@ -18,11 +19,11 @@ function retryDelayMs(body) {
 }
 
 export async function geminiJson(prompt, schema, { apiKey, signal, maxOutputTokens = 2048 } = {}) {
-  if (!apiKey) throw new Error('No Gemini API key. Add it in ⚙ Settings.');
-  const res = await fetch(GEMINI_URL, {
+  if (!apiKey && !serverBase()) throw new Error('No Gemini API key and no server set. Check ⚙ Settings.');
+  const res = await fetch(apiKey ? GEMINI_URL : `${serverBase()}/api/gemini`, {
     method: 'POST',
     signal,
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    headers: apiKey ? { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey } : { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {

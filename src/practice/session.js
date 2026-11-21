@@ -110,7 +110,7 @@ export class PracticeSession {
 
   _provider() {
     const p = this.getProvider();
-    return p === 'gemini' && this.getApiKey() ? 'gemini' : p === 'off' ? 'off' : 'preview';
+    return p === 'gemini' ? 'gemini' : p === 'off' ? 'off' : 'preview';
   }
 
   _closeWindow(force = false, final = false) {

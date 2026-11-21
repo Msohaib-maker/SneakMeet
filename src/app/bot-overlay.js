@@ -65,7 +65,7 @@ export function botOverlaySpeak(ids) {
     return;
   }
   const calm = state.dashboard.stateOf(m);
-  say(b.summary, `${m.name}: ${b.headline}. `, calm ? CALM_FACE[calm.id] : "neutral");
+  say(b.summary, `${m.name}: ${b.headline}${/[.!?]$/.test(b.headline) ? "" : "."} `, calm ? CALM_FACE[calm.id] : "neutral");
   spoke = true;
   botTalk(bot, 6000);
   speak(`${m.name}: ${b.headline}. ${b.summary}`, bot);

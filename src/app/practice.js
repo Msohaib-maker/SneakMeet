@@ -3,7 +3,6 @@ import { log, state, store } from "./state.js";
 import { ScanOverlay } from "../ui/scan.js";
 import { renderScans, updatePracticeToolbar } from "./toolbar.js";
 import { SCENARIOS } from "../ai/coach-ai.js";
-import { openSettings } from "./settings.js";
 import { PracticeSession } from "../practice/session.js";
 import { attachVideo, setLobbyControls, watchFps } from "./devices.js";
 import { startMeasuring, stopMeasuring } from "./measure.js";
@@ -31,11 +30,6 @@ export async function startPractice() {
   const instructions = els.practiceInstructions.value.trim();
   store.set("practiceScenario", scenario);
   store.set("practiceInstructions", instructions);
-  if (!els.simulated.checked && !els.apiKey.value.trim()) {
-    openSettings("vitals");
-    log("Set your SmartSpectra API key (or choose Simulated) first.");
-    return;
-  }
 
   els.psModal.hidden = true;
   els.pBot.replaceChildren(makeBodyBot());

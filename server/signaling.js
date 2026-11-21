@@ -3,11 +3,18 @@
 const os = require('os');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const { handleApi } = require('./api');
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_PER_ROOM = 6;
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
+  try {
+    if (await handleApi(req, res)) return;
+  } catch {
+    if (!res.headersSent) { res.writeHead(500); res.end(); }
+    return;
+  }
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('BetterZoom signaling server is running.\n');
 });

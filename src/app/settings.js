@@ -2,6 +2,7 @@ import { els } from "./dom.js";
 import { randomRoom, store } from "./state.js";
 import { applyPersona, getPersona } from "../ui/persona.js";
 import { setVoiceOn, voiceOn } from "../ui/voice.js";
+import { setServerUrl } from "../ai/server.js";
 
 export function loadSettings() {
   els.apiKey.value = store.get("apiKey", __DEFAULT_API_KEY__);
@@ -12,14 +13,11 @@ export function loadSettings() {
   const simParam = new URLSearchParams(location.search).get("simulated");
   els.simulated.checked = simParam
     ? simParam === "1"
-    : store.get("simulated", els.apiKey.value ? "0" : "1") === "1";
+    : store.get("simulated", "0") === "1";
   els.echoGate.checked = store.get("echoGate", "1") === "1";
   els.selfScan.checked = store.get("selfScan", "1") === "1";
   els.geminiKey.value = store.get("geminiKey", __DEFAULT_GEMINI_KEY__);
-  els.aiProvider.value = store.get(
-    "aiProvider",
-    els.geminiKey.value ? "gemini" : "preview",
-  );
+  els.aiProvider.value = store.get("aiProvider", "gemini");
   if (!els.aiProvider.value) els.aiProvider.value = "preview";
   els.asHost.checked = store.get("asHost", "0") === "1";
   els.name.value = store.get("name", "");
@@ -33,6 +31,7 @@ export function loadSettings() {
   els.showBot.checked = store.get("showBot", "1") === "1";
   els.botVoice.checked = voiceOn();
   renderVoiceButtons();
+  setServerUrl(els.serverUrl.value || __DEFAULT_SERVER_URL__);
   applyScreenLight();
   updateKeyStatus();
 }
@@ -62,6 +61,7 @@ export function saveSettings() {
   store.set("echoGate", els.echoGate.checked ? "1" : "0");
   store.set("selfScan", els.selfScan.checked ? "1" : "0");
   store.set("showBot", els.showBot.checked ? "1" : "0");
+  setServerUrl(els.serverUrl.value.trim() || __DEFAULT_SERVER_URL__);
   updateKeyStatus();
 }
 
@@ -78,12 +78,12 @@ export function updateKeyStatus() {
     text = `✓ Real readings ready (key …${k.slice(-4)}). Press Measure or Start scan.`;
     cls = "ok";
   } else {
-    text = "⚠ Paste your SmartSpectra API key above to measure real vitals.";
-    cls = "warn";
+    text = "✓ Real readings ready (using the BetterZoom server's key). Press Measure or Start scan.";
+    cls = "ok";
   }
   els.keyStatus.textContent = text;
   els.keyStatus.className = `key-status ${cls}`;
-  const needKey = !sim && !k;
+  const needKey = false;
   els.modeChip.textContent = sim
     ? "Vitals: SIMULATED · change"
     : needKey

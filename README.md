@@ -60,18 +60,22 @@ wellness reports.
    [Releases page](https://github.com/Msohaib-maker/SneakMeet/releases) and run it.
    The installer is not code-signed, so Windows SmartScreen may warn you: choose
    **More info → Run anyway**.
-2. Open **⚙ Settings** (or click the **Vitals:** chip in the lobby):
-   - **Vitals:** choose **Real readings** and paste a SmartSpectra API key (free at
-     https://physiology.presagetech.com/auth/register), or **Simulated** to try the app without one.
-     Simulated values are labelled **SIMULATED** everywhere.
-   - **AI:** a Gemini API key from https://aistudio.google.com/apikey (used by the Self mode coach and
-     the host's summaries), the bot personality, and voice.
-   - **Meeting:** the `wss://…` address of the signaling server. Everyone in a meeting must use the same
-     one. The default is the project's public server.
+2. That's it: **no API keys needed.** The BetterZoom server provides the SmartSpectra and Gemini access.
+   Optional, in **⚙ Settings**:
+   - **Vitals:** **Real readings** (default) or **Simulated** (demo numbers, labelled **SIMULATED**
+     everywhere). You can paste your own SmartSpectra key (free at
+     https://physiology.presagetech.com/auth/register) to use your own credits.
+   - **AI:** bot personality, voice, and optionally your own Gemini key
+     (https://aistudio.google.com/apikey).
+   - **Meeting:** the `wss://…` address of the server. Everyone in a meeting must use the same one.
+     The default is the project's public server.
 3. **Self mode:** pick a scenario and press **Practice solo**. **Meetings:** enter a name and room code
    and press **Join**.
 
-The installer contains **no API keys**. Each user enters their own. SmartSpectra usage is billed in
+**How keys work:** the installer contains **no API keys**. They live on the server as secrets. Gemini
+requests go through the server (`/api/gemini`), so the Gemini key never reaches users' computers. The
+SmartSpectra SDK must be given its key on the device, so the app fetches it from the server
+(`/api/sdk-key`) when measuring starts. The server rate-limits both. SmartSpectra usage is billed in
 credits (1 credit = 30 s of measuring); measuring only runs while readings are on.
 
 ## Run from source
@@ -146,6 +150,19 @@ Example (Render, Railway, Fly.io or any Node host):
 - Start command: `npm start`
 
 Then use `wss://<your-service-host>` as the meeting server in the app.
+
+**Keys on the server (optional):** set them as secrets so app users need none.
+
+```
+cd server
+fly secrets set GEMINI_API_KEY=... SMARTSPECTRA_API_KEY=...   # Fly.io (or your host's env vars)
+fly deploy
+```
+
+Endpoints: `GET /api/status` (which keys are configured), `GET /api/sdk-key`, `POST /api/gemini`
+(Gemini `generateContent` proxy, fixed model). Limits: 60 Gemini calls / 10 min and 20 key requests /
+10 min per IP, `GEMINI_DAILY_CAP` (default 1500) calls per day in total. Without the secrets the
+server works as a plain signaling server and users enter their own keys.
 Participants behind strict corporate networks may additionally need a TURN relay. The app uses
 public STUN only.
 
@@ -186,8 +203,9 @@ public STUN only.
 - **Vitals and face signals** are computed on each participant's own laptop. They leave it only if the
   participant chooses: **Share** (live values to everyone in the room) or **host reports** (live values
   plus a summary every ~25 s, to the host only). No images or video frames are ever sent with them.
-- **Signaling server:** relays connection setup (names, room codes, network offers). It never sees
-  media, vitals or reports, and stores nothing.
+- **BetterZoom server:** relays connection setup (names, room codes, network offers). It never sees
+  media. When you use the server's AI (no Gemini key of your own), it relays the same anonymous numbers
+  that go to Gemini (no names, no video) and returns Gemini's answer. It stores nothing.
 - **STUN** (`stun.l.google.com`) is used only to discover network addresses for peer connections.
 
 **AI processing (optional)**

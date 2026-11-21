@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; media-src 'self' blob: mediastream:; connect-src 'self' ws: wss: https://generativelanguage.googleapis.com; img-src 'self' data:;">
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; media-src 'self' blob: mediastream:; connect-src 'self' ws: wss: https: http://localhost:* http://127.0.0.1:*; img-src 'self' data:;">
   <title>BetterZoom</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -48,7 +48,7 @@
             <input id="api-key" type="password" placeholder="Paste your key" autocomplete="off" spellcheck="false">
             <button id="btn-show-key" type="button" class="secondary">Show</button>
           </span>
-          <span class="help">Free key: <b>physiology.presagetech.com</b> → register → API keys. Stored only on this computer.</span>
+          <span class="help"><b>Optional.</b> Leave empty to use the BetterZoom server's key. Your own key (free at <b>physiology.presagetech.com</b>) is stored only on this computer.</span>
         </label>
         <div id="key-status" class="key-status"></div>
       </section>
@@ -111,7 +111,7 @@
           <span class="row">
             <input id="gemini-key" type="password" placeholder="Paste your key" autocomplete="off" spellcheck="false">
           </span>
-          <span class="help">Free key: <b>aistudio.google.com/apikey</b>. Stored only on this computer.</span>
+          <span class="help"><b>Optional.</b> Leave empty to use the BetterZoom server's AI. Your own key (free at <b>aistudio.google.com/apikey</b>) is stored only on this computer.</span>
         </label>
       </section>
 
